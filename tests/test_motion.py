@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
-from PIL import Image, ImageDraw, ImageChops
+from PIL import Image, ImageDraw
 import gifmaker_core as core
 import image_motion
 
@@ -76,6 +76,7 @@ class MotionTests(unittest.TestCase):
     def test_bad_options_files_sizes_and_missing_jobs(self):
         self.assertEqual(self.upload(fps=31).status_code, 422)
         self.assertEqual(self.upload(duration=0).status_code, 422)
+        self.assertEqual(self.upload(fps=1, duration=1).status_code, 422)
         self.assertEqual(self.upload(prompt=" ").status_code, 422)
         self.assertEqual(self.client.get("/animate/not-a-job").status_code, 404)
         with patch.object(self.app_module, "MAX_IMAGE_BYTES", 1):

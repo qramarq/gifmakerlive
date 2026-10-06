@@ -22,6 +22,7 @@ $('animate-toggle').onchange = () => {
   $('browse').textContent=imageMode?'Choose an image ↗':'Choose a video ↗';
   $('upload-hint').textContent=imageMode?'PNG, JPEG, WebP · Up to 20 MiB':'MP4, MOV, WebM & more · Up to 100 MiB';
   $('replace').hidden=true; $('preview-tag').hidden=true;
+  $('replace').textContent=imageMode?'Replace image':'Replace clip';
   $('filename').textContent=imageMode?'No image selected':'No clip selected';
   $('convert').disabled=true; $('convert').textContent=imageMode?'Animate image ↗':'Create GIF ↗';
   $('motion-prompt').required=imageMode;
@@ -73,7 +74,9 @@ $('camera-tab').onclick = async () => {
     stream = camera;
     clearResult(); clip = undefined; $('convert').disabled = true;
     $('video').srcObject = stream; $('video').muted = true; $('video').controls = false; $('video').hidden = false;
-    await $('video').play(); $('empty').hidden = true; $('record').hidden = false; $('replace').hidden = true;
+    await $('video').play();
+    if(version!==selectionVersion || imageMode || busy){camera.getTracks().forEach(track=>track.stop());return;}
+    $('empty').hidden = true; $('record').hidden = false; $('replace').hidden = true;
     $('preview-tag').hidden = false; $('record').textContent = '● Start recording';
     $('camera-tab').classList.add('selected'); $('upload-tab').classList.remove('selected');
     $('filename').textContent = 'Camera ready · 30-second limit'; status('Camera is ready. Start recording when you are.');

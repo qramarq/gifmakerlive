@@ -34,7 +34,7 @@ pub fn plan(prompt: &str) -> Result<String, E> {
 }
 
 pub fn encode(frames: &str, output: &str, fps: i32, count: i32) -> Result<u64, E> {
-    if !(1..=30).contains(&fps) || count < fps || count > fps * 6 {
+    if !(1..=30).contains(&fps) || count < 2 || count < fps || count > fps * 6 {
         return Err(E::InvalidOptions);
     }
     let directory = Path::new(frames);

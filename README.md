@@ -26,7 +26,7 @@ The image renderer needs Node 22+ (Docker uses 24), Chromium, FFmpeg and Pillow.
 ```sh
 npm ci
 npx hyperframes browser ensure
-# Or set HYPERFRAMES_BROWSER_PATH to an already-installed Chromium executable.
+# Or set HYPERFRAMES_BROWSER_PATH to an installed Chrome Headless Shell executable (recommended on Windows).
 ```
 
 The backend uses only the pinned local CLI/GSAP packages and disables update/skill checks, automatic installation, and telemetry for render jobs. Prompts never enter HTML, JavaScript, subprocess command text, or URLs. `/health` reports whether the motion packages and Node are installed; a successful integration render is the readiness check for Chromium/FFmpeg. Keep at least 1 GiB free for HyperFrames' preflight check, with additional space for the job's frames.
@@ -81,7 +81,7 @@ Tests require the native library environment variable and FFmpeg. They exercise 
 
 ## Deployment
 
-Netlify builds the Wasm UI and proxies `/convert`, `/download/*`, and `/health` to the existing Render service. The conversion backend must migrate from its current Python runtime to the supplied Docker image; a repository merge alone does not change an existing Render service's runtime. Deploy and verify the Docker backend before promoting the new UI. `/health` must report `engine: rust-weaveffi`.
+Netlify builds the Wasm UI and proxies `/convert`, `/animate`, `/animate/*`, `/download/*`, and `/health` to the existing Render service. The conversion backend must migrate from its current Python runtime to the supplied Docker image; a repository merge alone does not change an existing Render service's runtime. Deploy and verify the Docker backend before promoting the new UI. `/health` must report `engine: rust-weaveffi`.
 
 The Docker backend serves the browser host as well, but its GPU files are produced by the separate Netlify build. Camera capture needs HTTPS (or localhost). No production deployment is performed by the development scripts.
 

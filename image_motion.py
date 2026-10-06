@@ -124,8 +124,8 @@ def run_renderer(project, frames, fps):
 
 
 def animate(source, destination, prompt, fps, width, duration, original_size):
-    if not 1 <= fps <= 30 or not 100 <= width <= 800 or not 1 <= duration <= 6:
-        raise MotionInputError("Use 1–30 FPS, 100–800 pixels, and a 1–6 second loop")
+    if not 1 <= fps <= 30 or not 100 <= width <= 800 or not 1 <= duration <= 6 or fps * duration < 2:
+        raise MotionInputError("Use 1–30 FPS, 100–800 pixels, and a 1–6 second loop with at least two frames")
     plan = json.loads(core.plan_motion(prompt))
     if not available():
         raise MotionUnavailable("Image motion is not installed on this server yet")

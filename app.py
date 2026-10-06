@@ -7,7 +7,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 import gifmaker_core as core
@@ -44,8 +44,8 @@ async def animate_image(background: BackgroundTasks, file: UploadFile = File(...
                 del motion_jobs[old_job]
         if sum(state["status"] in {"uploading", "queued", "rendering"} for state in motion_jobs.values()) >= 4:
             raise HTTPException(503, "The image renderer is busy. Please try again shortly")
-        if not 1 <= fps <= 30 or not 100 <= width <= 800 or not 1 <= duration <= 6:
-            raise HTTPException(422, "Use 1–30 FPS, 100–800 pixels, and a 1–6 second loop")
+        if not 1 <= fps <= 30 or not 100 <= width <= 800 or not 1 <= duration <= 6 or fps * duration < 2:
+            raise HTTPException(422, "Use 1–30 FPS, 100–800 pixels, and a 1–6 second loop with at least two frames")
         # Validate even before writing an upload. The same Rust planner is used by the worker.
         core.plan_motion(prompt)
         if Path(file.filename or "").suffix.lower() not in {".png", ".jpg", ".jpeg", ".webp"}:
@@ -97,7 +97,7 @@ async def motion_status(job: str):
     state = motion_jobs.get(job)
     if not state or state.get("expires", float("inf")) < time.monotonic():
         raise HTTPException(404, "This motion job has expired or the server restarted. Please try again")
-    return {key: value for key, value in state.items() if key != "expires"}
+    return JSONResponse({key: value for key, value in state.items() if key != "expires"}, headers={"Cache-Control": "no-store"})
 
 @app.post("/convert")
 async def convert_video(file: UploadFile = File(...), fps: int = Form(10), width: int = Form(320)):
