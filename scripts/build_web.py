@@ -18,4 +18,3 @@ subprocess.run(["wasm-bindgen", str(root / f"target/wasm32-unknown-unknown/{mode
 for path in (root / "crates/studio/fonts").iterdir():
     shutil.copy2(path, root / "web/fonts" / path.name)
 shutil.copytree(root / "web", root / "dist", dirs_exist_ok=True)
-

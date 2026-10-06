@@ -15,4 +15,3 @@ ENV GIFMAKER_CORE_LIBRARY=/app/libgifmaker_core.so
 COPY app.py ./
 COPY web ./web
 CMD ["sh", "-c", "uvicorn app:app --host 0.0.0.0 --port ${PORT:-8000}"]
-

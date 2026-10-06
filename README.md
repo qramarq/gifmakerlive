@@ -2,6 +2,8 @@
 
 A browser GIF studio with a GPUI WebAssembly settings panel and a Rust conversion core exposed through WeaveFFI 0.24.0. Upload a video or record your camera, choose FPS/width, preview and download a looping GIF.
 
+**Loop GIF is always enabled.** Every generated GIF embeds infinite playback, so previews and downloaded files repeat continuously without an extra setting.
+
 ## Architecture
 
 - `crates/gif-core`: validates conversion options and runs FFmpeg with palette optimization, a 120-second timeout and atomic output publication.

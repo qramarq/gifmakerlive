@@ -25,17 +25,20 @@ class ConversionTests(unittest.TestCase):
         cls.temp.cleanup()
 
     def test_rust_binding_conversion_download_and_cleanup(self):
-        with self.source.open("rb") as source:
-            response = self.client.post("/convert", files={"file": ("sample.mp4", source, "video/mp4")}, data={"fps":15,"width":480})
-        self.assertEqual(response.status_code, 200, response.text)
-        result = response.json()
-        gif = self.client.get("/download/" + result["filename"])
-        self.assertEqual(gif.status_code, 200)
-        self.assertEqual(gif.headers["content-type"], "image/gif")
-        self.assertEqual(int.from_bytes(gif.content[6:8], "little"), 480)
-        self.assertEqual(int.from_bytes(gif.content[8:10], "little"), 270)
-        self.assertIn(b"NETSCAPE2.0", gif.content)  # Looping animation extension.
-        self.assertFalse(list((self.root / "uploads").iterdir()))
+        for settings, dimensions in [({}, (320, 180)), ({"fps":15,"width":480}, (480, 270))]:
+            with self.subTest(settings=settings):
+                with self.source.open("rb") as source:
+                    response = self.client.post("/convert", files={"file": ("sample.mp4", source, "video/mp4")}, data=settings)
+                self.assertEqual(response.status_code, 200, response.text)
+                result = response.json()
+                gif = self.client.get("/download/" + result["filename"])
+                self.assertEqual(gif.status_code, 200)
+                self.assertEqual(gif.headers["content-type"], "image/gif")
+                self.assertEqual(int.from_bytes(gif.content[6:8], "little"), dimensions[0])
+                self.assertEqual(int.from_bytes(gif.content[8:10], "little"), dimensions[1])
+                # Verify the actual downloaded file repeats forever (loop count zero).
+                self.assertIn(b"\x21\xff\x0bNETSCAPE2.0\x03\x01\x00\x00\x00", gif.content)
+                self.assertFalse(list((self.root / "uploads").iterdir()))
 
     def test_bad_input_and_options(self):
         for data, file, expected in [({"fps":0},("x.mp4",b"data"),422), ({},("x.txt",b"data"),400), ({},("x.mp4",b""),400), ({},("x.mp4",b"invalid video"),422)]:
