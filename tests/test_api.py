@@ -1,4 +1,5 @@
 """Integration tests deliberately call the generated binding and real FFmpeg."""
+import asyncio
 import importlib
 import os
 from pathlib import Path
@@ -57,6 +58,12 @@ class ConversionTests(unittest.TestCase):
         self.assertEqual(self.client.get("/download/not-a-gif").status_code, 400)
         self.assertEqual(self.client.get("/download/output_" + "a" * 32 + ".gif").status_code, 404)
         self.assertEqual(self.client.get("/health").json()["engine"], "rust-weaveffi")
+
+    def test_conversion_rejects_saturated_encoder_and_cleans_upload(self):
+        with patch.object(self.app_module, "conversion_slots", asyncio.Semaphore(0)):
+            response = self.client.post("/convert", files={"file": ("sample.mp4", self.source.read_bytes(), "video/mp4")})
+        self.assertEqual(response.status_code, 503, response.text)
+        self.assertFalse(list((self.root / "uploads").iterdir()))
 
 if __name__ == "__main__":
     unittest.main()

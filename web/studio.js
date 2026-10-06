@@ -1,6 +1,6 @@
 const $ = id => document.getElementById(id);
 let clip, stream, recorder, sourceUrl, gifUrl, timer, busy = false, recordingBytes = 0;
-let imageMode = false, selectionVersion = 0;
+let imageMode = false, selectionVersion = 0, pendingMotionJobId;
 const MAX_BYTES = 100 * 1024 * 1024;
 function syncSettings() {
   $('settings').contentWindow.postMessage({type:'gif-host-settings',fps:Number($('fps').value),width:Number($('width').value),duration:Number($('duration').value),imageMode},location.origin);
@@ -10,6 +10,7 @@ document.querySelectorAll('[data-prompt]').forEach(button => {button.onclick = (
 $('animate-toggle').onchange = () => {
   if (busy) return;
   imageMode=$('animate-toggle').checked; selectionVersion++;
+  pendingMotionJobId=undefined;
   stopCamera(); clearResult(); clip=undefined;
   if(sourceUrl) URL.revokeObjectURL(sourceUrl); sourceUrl=undefined;
   $('video').removeAttribute('src'); $('still').removeAttribute('src');
@@ -37,7 +38,7 @@ function clearResult() {
 function stopCamera() {
   selectionVersion++;
   clearTimeout(timer);
-  if (recorder?.state === 'recording') { recorder.onstop = null; recorder.stop(); }
+  if (recorder) { recorder.onstop = null; if (recorder.state === 'recording') recorder.stop(); }
   stream?.getTracks().forEach(track => track.stop()); stream = undefined;
   $('record').hidden = true; $('video').srcObject = null;
 }
@@ -46,7 +47,7 @@ function selectFile(file) {
   const supported=imageMode?/\.(png|jpe?g|webp)$/i:/\.(mp4|mov|webm|avi|mkv|m4v)$/i;
   if (!supported.test(file.name)) return status(imageMode?'Choose a still PNG, JPEG, or WebP image.':'Choose an MP4, MOV, WebM, AVI, MKV or M4V video.', true);
   if (!file.size || file.size > (imageMode?20*1024*1024:MAX_BYTES)) return status(imageMode?'Choose a nonempty image smaller than 20 MiB.':'Choose a nonempty video smaller than 100 MiB.', true);
-  selectionVersion++;
+  selectionVersion++; pendingMotionJobId=undefined;
   stopCamera(); clearResult(); clip = file;
   if (sourceUrl) URL.revokeObjectURL(sourceUrl);
   sourceUrl = URL.createObjectURL(file);
@@ -55,7 +56,7 @@ function selectFile(file) {
   else {video.src = sourceUrl; video.muted = false; video.controls = true;}
   $('empty').hidden = true; $('preview-tag').hidden = true; $('replace').hidden = false;
   $('filename').textContent = `${file.name} · ${(file.size / 1024 / 1024).toFixed(1)} MiB`;
-  $('convert').disabled = false; $('upload-tab').classList.add('selected'); $('camera-tab').classList.remove('selected');
+  $('convert').disabled = false; $('convert').textContent=imageMode?'Animate image ↗':'Create GIF ↗'; $('upload-tab').classList.add('selected'); $('camera-tab').classList.remove('selected');
   status(imageMode?'Original loaded. Describe one motion, or choose an example.':'Ready when you are. Pick your settings and create a GIF.');
 }
 $('browse').onclick = $('replace').onclick = () => $('file').click();
@@ -110,9 +111,9 @@ window.addEventListener('message', event => {
   }
 });
 $('convert').onclick = async () => {
-  if(!clip || busy) return;
-  if(!$('fps').reportValidity() || !$('width').reportValidity()) return;
-  if(imageMode && (!$('motion-prompt').reportValidity() || !$('duration').reportValidity())) return;
+  if((!clip && !pendingMotionJobId) || busy) return;
+  if(!pendingMotionJobId && (!$('fps').reportValidity() || !$('width').reportValidity())) return;
+  if(!pendingMotionJobId && imageMode && (!$('motion-prompt').reportValidity() || !$('duration').reportValidity())) return;
   selectionVersion++; busy = true; $('convert').disabled = true;
   const controls=['camera-tab','upload-tab','replace','browse','animate-toggle','motion-prompt','duration','original-size','fps','width'];
   for(const id of controls) $(id).disabled = true;
@@ -120,30 +121,44 @@ $('convert').onclick = async () => {
   $('settings').inert=true;
   clearResult(); $('video').pause(); $('still').hidden=!imageMode; $('video').hidden=imageMode;
   status(imageMode?'Rendering your original image into a loop…':'Creating your loop… larger clips can take up to two minutes.');
-  const data = new FormData(); data.append('file',clip); data.append('fps',$('fps').value); data.append('width',$('width').value);
-  if(imageMode){data.append('prompt',$('motion-prompt').value.trim());data.append('duration',$('duration').value);data.append('original_size',$('original-size').checked);}
+  const data = new FormData();
+  if(clip) data.append('file',clip);
+  data.append('fps',$('fps').value); data.append('width',$('width').value);
+  if(imageMode && !pendingMotionJobId){data.append('prompt',$('motion-prompt').value.trim());data.append('duration',$('duration').value);data.append('original_size',$('original-size').checked);}
   try {
-    const response = await fetch(imageMode?'/animate':'/convert', {method:'POST',body:data,signal:AbortSignal.timeout(150000)});
-    let result = await response.json().catch(() => ({}));
-    if(!response.ok) throw new Error(typeof result.detail === 'string' ? result.detail : 'Conversion failed. Try a shorter video.');
+    let result;
     if(imageMode){
-      if(!/^[a-f0-9]{32}$/.test(result.job_id)) throw new Error('The server returned an invalid motion job.');
-      const jobId=result.job_id, deadline=Date.now()+300000;
+      if(pendingMotionJobId) result={job_id:pendingMotionJobId};
+      else {
+        const response = await fetch('/animate', {method:'POST',body:data,signal:AbortSignal.timeout(150000)});
+        result = await response.json().catch(() => ({}));
+        if(!response.ok) throw new Error(typeof result.detail === 'string' ? result.detail : 'Conversion failed. Try a shorter image.');
+        if(!/^[a-f0-9]{32}$/.test(result.job_id)) throw new Error('The server returned an invalid motion job.');
+        pendingMotionJobId=result.job_id;
+      }
+      const jobId=result.job_id, queueDeadline=Date.now()+900000;
+      let renderDeadline;
       while(true){
-        if(Date.now()>deadline) throw new Error('The render took too long. Please try a smaller image.');
+        if(Date.now()>(renderDeadline ?? queueDeadline)) throw new Error(renderDeadline?'Rendering is taking longer than expected. Select Resume checking to continue.':'The image is still queued. Select Resume checking to continue.');
         const poll=await fetch(`/animate/${jobId}`,{signal:AbortSignal.timeout(15000)});
-        result=await poll.json();
-        if(!poll.ok || result.status==='failed') throw new Error(result.detail || 'This motion job is no longer available. Try again.');
+        result=await poll.json().catch(() => ({}));
+        if(!poll.ok || result.status==='failed') {pendingMotionJobId=undefined; throw new Error(result.detail || 'This motion job is no longer available. Try again.');}
         if(result.status==='ready') break;
+        if(result.status==='rendering' && !renderDeadline) renderDeadline=Date.now()+300000;
         status(result.status==='queued'?'Your image is queued for rendering…':'Rendering your image with HyperFrames…');
         await new Promise(resolve=>setTimeout(resolve,1000));
       }
+    } else {
+      const response = await fetch('/convert', {method:'POST',body:data,signal:AbortSignal.timeout(150000)});
+      result = await response.json().catch(() => ({}));
+      if(!response.ok) throw new Error(typeof result.detail === 'string' ? result.detail : 'Conversion failed. Try a shorter video.');
     }
     if(!/^output_[a-f0-9]{8,32}\.gif$/.test(result.filename)) throw new Error('The server returned an invalid download.');
     const download = await fetch(`/download/${encodeURIComponent(result.filename)}`,{signal:AbortSignal.timeout(30000)});
     if(!download.ok) throw new Error('The GIF could not be downloaded. Please try again.');
     const blob = await download.blob();
     if (!blob.type.startsWith('image/gif')) throw new Error('The server did not return a GIF. Please try again.');
+    pendingMotionJobId=undefined;
     gifUrl = URL.createObjectURL(blob);
     $('gif').src = gifUrl; $('gif').hidden = false; $('video').hidden = $('still').hidden = true;
     $('download').href = gifUrl; $('download').download = 'my-loop.gif'; $('download').hidden = false;
@@ -151,6 +166,6 @@ $('convert').onclick = async () => {
     $('convert').textContent = 'Create another version ↗';
     status(`Loop ready · Repeats continuously · ${(blob.size/1024).toFixed(1)} KB · ${result.fps} fps · ${result.width} px`);
   } catch(error) {status(error.name === 'TimeoutError' ? 'The server took too long. Try a shorter clip.' : error.message, true);}
-  finally {busy = false; $('convert').disabled = false; for(const id of controls) $(id).disabled = false; document.querySelectorAll('[data-prompt]').forEach(button=>button.disabled=false); $('settings').inert=false;}
+  finally {busy = false; $('convert').disabled = !clip && !pendingMotionJobId; $('convert').textContent=pendingMotionJobId?'Resume checking ↗':gifUrl?'Create another version ↗':imageMode?'Animate image ↗':'Create GIF ↗'; for(const id of controls) $(id).disabled = false; document.querySelectorAll('[data-prompt]').forEach(button=>button.disabled=false); $('settings').inert=false;}
 };
 window.addEventListener('pagehide', event => {if(recorder) recorder.onstop = null; stopCamera(); if(!event.persisted){if(sourceUrl) URL.revokeObjectURL(sourceUrl); if(gifUrl) URL.revokeObjectURL(gifUrl);}});

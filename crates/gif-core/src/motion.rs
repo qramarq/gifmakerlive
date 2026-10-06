@@ -1,7 +1,12 @@
 //! A small, explicit prompt grammar. Unrecognised requests must never silently
 //! become another effect or get interpolated into HTML / shell commands.
 use crate::gif::ConversionError as E;
-use std::{io::Read, path::Path, process::Command};
+use std::{
+    io::Read,
+    path::Path,
+    process::Command,
+    time::{Duration, Instant},
+};
 
 pub fn plan(prompt: &str) -> Result<String, E> {
     if prompt.len() > 240 {
@@ -65,13 +70,64 @@ pub fn encode(frames: &str, output: &str, fps: i32, count: i32) -> Result<u64, E
     }
     // One palette for the entire loop and no dithering: stable flat colors,
     // no moving dither pattern, no resize or YUV/chroma-subsampled intermediate.
-    let mut command = Command::new("ffmpeg");
-    command.args(["-hide_banner", "-loglevel", "error", "-nostdin", "-y",
-        "-framerate", &fps.to_string(), "-start_number", "0", "-i"])
+    let deadline = Instant::now() + Duration::from_secs(120);
+    let palette = tempfile::Builder::new()
+        .suffix(".png")
+        .tempfile()
+        .map_err(|_| E::OutputFailed)?;
+    let mut palette_command = Command::new("ffmpeg");
+    palette_command
+        .args([
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-nostdin",
+            "-y",
+            "-framerate",
+            &fps.to_string(),
+            "-start_number",
+            "0",
+            "-i",
+        ])
         .arg(directory.join("frame_%06d.png"))
-        .args(["-filter_complex", "split[a][b];[a]palettegen=stats_mode=full:reserve_transparent=1[p];[b][p]paletteuse=dither=none:alpha_threshold=128",
-            "-frames:v", &count.to_string(), "-loop", "0", "-f", "gif"]);
-    crate::encode_command(command, output)
+        .args([
+            "-vf",
+            "palettegen=stats_mode=full:reserve_transparent=1",
+            "-frames:v",
+            "1",
+        ]);
+    crate::run_command_until(palette_command.arg(palette.path()), deadline)?;
+
+    let mut command = Command::new("ffmpeg");
+    command
+        .args([
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-nostdin",
+            "-y",
+            "-framerate",
+            &fps.to_string(),
+            "-start_number",
+            "0",
+            "-i",
+        ])
+        .arg(directory.join("frame_%06d.png"))
+        .args(["-i"])
+        .arg(palette.path())
+        .args([
+            "-filter_complex",
+            "[0:v][1:v]paletteuse=dither=none:alpha_threshold=128[out]",
+            "-map",
+            "[out]",
+            "-frames:v",
+            &count.to_string(),
+            "-loop",
+            "0",
+            "-f",
+            "gif",
+        ]);
+    crate::encode_command_until(command, output, deadline)
 }
 
 #[cfg(test)]

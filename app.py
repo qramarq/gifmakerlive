@@ -120,6 +120,8 @@ async def convert_video(file: UploadFile = File(...), fps: int = Form(10), width
                 stream.write(chunk)
         if not total:
             raise HTTPException(400, "The video is empty")
+        if conversion_slots.locked():
+            raise HTTPException(503, "The video converter is busy. Please try again shortly")
         async with conversion_slots:
             # ctypes releases the GIL; the worker also keeps the event loop responsive.
             size = await run_in_threadpool(core.convert, str(source), str(destination), fps, width)

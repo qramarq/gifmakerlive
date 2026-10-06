@@ -124,10 +124,6 @@ fn encode(input: &str, output: &str, fps: i32, width: i32) -> Result<u64, gif::C
     encode_command_until(command, output, deadline)
 }
 
-fn encode_command(command: Command, output: &str) -> Result<u64, gif::ConversionError> {
-    encode_command_until(command, output, Instant::now() + Duration::from_secs(120))
-}
-
 fn encode_command_until(
     mut command: Command,
     output: &str,
