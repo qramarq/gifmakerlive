@@ -4,14 +4,17 @@ use crate::gif::ConversionError as E;
 use std::{io::Read, path::Path, process::Command};
 
 pub fn plan(prompt: &str) -> Result<String, E> {
-    if prompt.len() > 240 { return Err(E::UnsupportedMotion); }
+    if prompt.len() > 240 {
+        return Err(E::UnsupportedMotion);
+    }
     let lower = prompt.trim().trim_end_matches('.').to_ascii_lowercase();
     let mut words: Vec<&str> = lower.split_whitespace().collect();
     let gentle = words.contains(&"gently") || words.contains(&"subtly");
     // Filler/modifiers cannot conceal negation, an extra instruction, or a subject.
     words.retain(|w| !["please", "gently", "subtly"].contains(w));
     let text = words.join(" ");
-    let text = text.strip_prefix("make the image ")
+    let text = text
+        .strip_prefix("make the image ")
         .or_else(|| text.strip_prefix("make the photo "))
         .or_else(|| text.strip_prefix("make it "))
         .unwrap_or(&text);
@@ -22,7 +25,9 @@ pub fn plan(prompt: &str) -> Result<String, E> {
         "zoom in" | "zoom in and back out" => "zoom-in",
         "zoom out" | "zoom out and back in" => "zoom-out",
         "rotate clockwise" | "rotate clockwise and back" => "rotate-cw",
-        "rotate counterclockwise" | "rotate anticlockwise" | "rotate counterclockwise and back" => "rotate-ccw",
+        "rotate counterclockwise" | "rotate anticlockwise" | "rotate counterclockwise and back" => {
+            "rotate-ccw"
+        }
         _ => return Err(E::UnsupportedMotion),
     };
     Ok(format!(r#"{{"effect":"{effect}","gentle":{gentle}}}"#))
@@ -37,15 +42,23 @@ pub fn encode(frames: &str, output: &str, fps: i32, count: i32) -> Result<u64, E
     for index in 0..count {
         let path = directory.join(format!("frame_{index:06}.png"));
         let mut file = std::fs::File::open(path).map_err(|_| E::InvalidInput)?;
-        if file.metadata().map_err(|_| E::InvalidInput)?.len() > 16 * 1024 * 1024 { return Err(E::InvalidInput); }
+        if file.metadata().map_err(|_| E::InvalidInput)?.len() > 16 * 1024 * 1024 {
+            return Err(E::InvalidInput);
+        }
         let mut header = [0u8; 24];
         file.read_exact(&mut header).map_err(|_| E::InvalidInput)?;
-        if &header[..8] != b"\x89PNG\r\n\x1a\n" || &header[12..16] != b"IHDR" { return Err(E::InvalidInput); }
+        if &header[..8] != b"\x89PNG\r\n\x1a\n" || &header[12..16] != b"IHDR" {
+            return Err(E::InvalidInput);
+        }
         let width = u32::from_be_bytes(header[16..20].try_into().unwrap());
         let height = u32::from_be_bytes(header[20..24].try_into().unwrap());
-        if width == 0 || height == 0 || width > 1800 || height > 1800
+        if width == 0
+            || height == 0
+            || width > 1800
+            || height > 1800
             || u64::from(width) * u64::from(height) * count as u64 > 120_000_000
-            || dimensions.is_some_and(|d| d != (width, height)) {
+            || dimensions.is_some_and(|d| d != (width, height))
+        {
             return Err(E::InvalidOptions);
         }
         dimensions = Some((width, height));
@@ -66,15 +79,29 @@ mod tests {
     use super::*;
     #[test]
     fn refuses_ambiguous_or_unimplemented_instructions() {
-        for prompt in ["", "don't zoom in", "pan left and make the cat wave", "make the water ripple", "<script>pan left</script>", "pan left 100 pixels", "pan left; rm -rf /"] {
+        for prompt in [
+            "",
+            "don't zoom in",
+            "pan left and make the cat wave",
+            "make the water ripple",
+            "<script>pan left</script>",
+            "pan left 100 pixels",
+            "pan left; rm -rf /",
+        ] {
             assert_eq!(plan(prompt), Err(E::UnsupportedMotion), "{prompt}");
         }
-        assert_eq!(plan("Please gently float up and down.").unwrap(), r#"{"effect":"float","gentle":true}"#);
+        assert_eq!(
+            plan("Please gently float up and down.").unwrap(),
+            r#"{"effect":"float","gentle":true}"#
+        );
         assert!(plan("make the image zoom in").unwrap().contains("zoom-in"));
     }
     #[test]
     fn enforces_frame_budget_before_encoding() {
-        assert_eq!(encode("missing", "out.gif", 30, 181), Err(E::InvalidOptions));
+        assert_eq!(
+            encode("missing", "out.gif", 30, 181),
+            Err(E::InvalidOptions)
+        );
         assert_eq!(encode("missing", "out.gif", 10, 40), Err(E::InvalidInput));
     }
 }

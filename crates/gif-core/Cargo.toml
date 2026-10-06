@@ -9,4 +9,3 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 weaveffi = "=0.24.0"
 tempfile = "3"
-

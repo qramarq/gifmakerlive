@@ -2,37 +2,63 @@ use gpui::{prelude::*, *};
 use std::{borrow::Cow, cell::RefCell};
 use wasm_bindgen::prelude::*;
 
-#[wasm_bindgen(inline_js = "export function settings(fps,width,duration){parent.postMessage({type:'gif-settings',fps,width,duration},location.origin)}")]
-extern "C" { fn settings(fps: i32, width: i32, duration: i32); }
+#[wasm_bindgen(
+    inline_js = "export function settings(fps,width,duration){parent.postMessage({type:'gif-settings',fps,width,duration},location.origin)}"
+)]
+extern "C" {
+    fn settings(fps: i32, width: i32, duration: i32);
+}
 
 thread_local! {
     static APPLICATION: RefCell<Option<ApplicationHandle>> = const { RefCell::new(None) };
     static STUDIO: RefCell<Option<Entity<Studio>>> = const { RefCell::new(None) };
 }
 
-struct Studio { fps: i32, width: i32, duration: i32, image_mode: bool }
+struct Studio {
+    fps: i32,
+    width: i32,
+    duration: i32,
+    image_mode: bool,
+}
 
 #[wasm_bindgen]
 pub fn sync_settings(fps: i32, width: i32, duration: i32, image_mode: bool) {
-    if !(1..=30).contains(&fps) || !(100..=800).contains(&width) || !(1..=6).contains(&duration) { return; }
+    if !(1..=30).contains(&fps) || !(100..=800).contains(&width) || !(1..=6).contains(&duration) {
+        return;
+    }
     APPLICATION.with(|app| {
         if let Some(app) = app.borrow().as_ref() {
-            app.update(|cx| STUDIO.with(|studio| {
-                if let Some(studio) = studio.borrow().as_ref() {
-                    studio.update(cx, |s, cx| { s.fps=fps; s.width=width; s.duration=duration; s.image_mode=image_mode; cx.notify(); });
-                }
-            }));
+            app.update(|cx| {
+                STUDIO.with(|studio| {
+                    if let Some(studio) = studio.borrow().as_ref() {
+                        studio.update(cx, |s, cx| {
+                            s.fps = fps;
+                            s.width = width;
+                            s.duration = duration;
+                            s.image_mode = image_mode;
+                            cx.notify();
+                        });
+                    }
+                })
+            });
         }
     });
 }
 
 impl Studio {
     fn choice(&self, id: &'static str, label: String, active: bool) -> Stateful<Div> {
-        div().id(id).flex_1().p_3().rounded_lg().border_1()
+        div()
+            .id(id)
+            .flex_1()
+            .p_3()
+            .rounded_lg()
+            .border_1()
             .border_color(rgb(if active { 0xc2f970 } else { 0x343737 }))
             .bg(rgb(if active { 0x293822 } else { 0x202323 }))
             .text_color(rgb(if active { 0xc2f970 } else { 0xd9dddd }))
-            .text_sm().cursor_pointer().hover(|style| style.bg(rgb(0x34402e)))
+            .text_sm()
+            .cursor_pointer()
+            .hover(|style| style.bg(rgb(0x34402e)))
             .child(label)
     }
 }
@@ -72,14 +98,23 @@ pub fn run() {
     console_error_panic_hook::set_once();
     gpui_platform::web_init();
     let handle = gpui_platform::single_threaded_web().run_embedded(|cx: &mut App| {
-        cx.text_system().add_fonts(vec![Cow::Borrowed(include_bytes!("../fonts/IBMPlexSans-Regular.ttf").as_slice())]).expect("load bundled font");
+        cx.text_system()
+            .add_fonts(vec![Cow::Borrowed(
+                include_bytes!("../fonts/IBMPlexSans-Regular.ttf").as_slice(),
+            )])
+            .expect("load bundled font");
         cx.open_window(WindowOptions::default(), |_, cx| {
-            let studio = cx.new(|_| Studio {fps:10,width:320,duration:4,image_mode:false});
+            let studio = cx.new(|_| Studio {
+                fps: 10,
+                width: 320,
+                duration: 4,
+                image_mode: false,
+            });
             STUDIO.with(|state| *state.borrow_mut() = Some(studio.clone()));
             studio
-        }).expect("open settings");
+        })
+        .expect("open settings");
         cx.activate(true);
     });
     APPLICATION.with(|app| *app.borrow_mut() = Some(handle));
 }
-

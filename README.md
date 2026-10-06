@@ -4,6 +4,8 @@ A browser GIF studio with a GPUI WebAssembly settings panel and a Rust conversio
 
 ## Still-image motion
 
+**Loop GIF is always enabled.** Every generated GIF embeds infinite playback, so previews and downloaded files repeat continuously.
+
 Turn on **Animate a still image**, choose a PNG/JPEG/WebP, and type one motion:
 
 - `Gently float up and down`

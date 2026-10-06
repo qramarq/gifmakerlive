@@ -34,6 +34,7 @@ function clearResult() {
   gifUrl = undefined; $('gif').hidden = true; $('download').hidden = true; $('convert').hidden = false;
 }
 function stopCamera() {
+  selectionVersion++;
   clearTimeout(timer);
   if (recorder?.state === 'recording') { recorder.onstop = null; recorder.stop(); }
   stream?.getTracks().forEach(track => track.stop()); stream = undefined;
@@ -65,8 +66,8 @@ $('dropzone').addEventListener('drop', e => selectFile(e.dataTransfer.files[0]))
 $('camera-tab').onclick = async () => {
   if (busy || stream || imageMode) return;
   if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) return status('Camera recording is unavailable in this browser. Upload a clip instead.', true);
+  const version=++selectionVersion;
   try {
-    const version=++selectionVersion;
     const camera=await navigator.mediaDevices.getUserMedia({video: true, audio: false});
     if(version!==selectionVersion || imageMode || busy){camera.getTracks().forEach(track=>track.stop());return;}
     stream = camera;
@@ -76,7 +77,7 @@ $('camera-tab').onclick = async () => {
     $('preview-tag').hidden = false; $('record').textContent = '● Start recording';
     $('camera-tab').classList.add('selected'); $('upload-tab').classList.remove('selected');
     $('filename').textContent = 'Camera ready · 30-second limit'; status('Camera is ready. Start recording when you are.');
-  } catch (error) { stopCamera(); status('Camera access failed. Check your browser permission or upload a video.', true); }
+  } catch (error) { if(version===selectionVersion){stopCamera(); status('Camera access failed. Check your browser permission or upload a video.', true);} }
 };
 $('record').onclick = () => {
   if (recorder?.state === 'recording') {recorder.stop(); return;}
@@ -136,12 +137,14 @@ $('convert').onclick = async () => {
     if(!/^output_[a-f0-9]{8,32}\.gif$/.test(result.filename)) throw new Error('The server returned an invalid download.');
     const download = await fetch(`/download/${encodeURIComponent(result.filename)}`,{signal:AbortSignal.timeout(30000)});
     if(!download.ok) throw new Error('The GIF could not be downloaded. Please try again.');
-    const blob = await download.blob(); gifUrl = URL.createObjectURL(blob);
+    const blob = await download.blob();
+    if (!blob.type.startsWith('image/gif')) throw new Error('The server did not return a GIF. Please try again.');
+    gifUrl = URL.createObjectURL(blob);
     $('gif').src = gifUrl; $('gif').hidden = false; $('video').hidden = $('still').hidden = true;
     $('download').href = gifUrl; $('download').download = 'my-loop.gif'; $('download').hidden = false;
     // Keep conversion available to try a different recipe with the same source.
     $('convert').textContent = 'Create another version ↗';
-    status(`Loop ready · ${(blob.size/1024).toFixed(1)} KB · ${result.fps} fps · ${result.width} px`);
+    status(`Loop ready · Repeats continuously · ${(blob.size/1024).toFixed(1)} KB · ${result.fps} fps · ${result.width} px`);
   } catch(error) {status(error.name === 'TimeoutError' ? 'The server took too long. Try a shorter clip.' : error.message, true);}
   finally {busy = false; $('convert').disabled = false; for(const id of controls) $(id).disabled = false; document.querySelectorAll('[data-prompt]').forEach(button=>button.disabled=false); $('settings').inert=false;}
 };
