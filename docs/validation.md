@@ -1,6 +1,6 @@
 # Rebuild validation — October 5, 2026
 
-Implemented in `codex/gpui-weaveffi-rebuild`. No production deployment or repository rule change has been made.
+Implemented in `codex/gpui-weaveffi-rebuild`. No production deployment has been made. The owner-approved review-branch exception is recorded below.
 
 ## Verified locally
 
@@ -19,11 +19,11 @@ The machine had little free disk space. A workspace-local Rust 1.99.0 toolchain 
 
 The debug Wasm build succeeds. Optimized builds exhausted disk space, including a retry without link-time optimization. Optimized packaging remains unverified and should pass CI before release. Generated Wasm/native binaries and build caches are excluded from Git.
 
-## GitHub blocker
+## GitHub publication
 
-GitHub rejected the branch push under active ruleset `marq` (ID 11077202). It applies to all branches, has no exclusions or bypass actors, restricts branch creation and updates, and requires verified commit signatures. It also enforces review and scanning rules. No PR was created and no CI run was triggered.
+The initial push was rejected by active ruleset `marq` (ID 11077202), which restricted creation and updates on all branches and required verified signatures. With explicit owner approval, only `refs/heads/codex/*` was added to the ruleset exclusions. The ruleset remains active, and the effective rules on `main` were verified unchanged. The review branch is now pushed.
 
-A narrow exception for `refs/heads/codex/*` was proposed to the owner; no exception has been applied. `main` protections must remain in place. After publishing, run the supplied workflow, inspect the browser artifact, and resolve checks before merge.
+Optimized packaging and the pinned nightly build still need successful CI before release. Existing review and scanning requirements on `main` continue to apply.
 
 ## Deployment gate
 
