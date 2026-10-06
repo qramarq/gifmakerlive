@@ -19,3 +19,14 @@ output/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Build outputs
+target/
+dist/
+web/wasm/
+web/fonts/
+*.dll
+*.pdb
+.weaveffi-cache/
+build/
+*.egg-info/

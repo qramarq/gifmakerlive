@@ -1,0 +1,13 @@
+[package]
+name = "gifmaker-studio"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+gpui = { package = "gpui-pre", version = "=0.3.8" }
+gpui_platform = { package = "gpui-pre-platform", version = "=0.3.8" }
+wasm-bindgen = "=0.2.121"
+console_error_panic_hook = "0.1"

@@ -1,0 +1,5 @@
+[project]
+input = "src/lib.rs"
+out = "../../bindings"
+targets = ["python", "c"]
+

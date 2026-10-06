@@ -1,0 +1,16 @@
+[workspace]
+members = ["crates/gif-core", "crates/studio"]
+default-members = ["crates/gif-core"]
+resolver = "2"
+
+[profile.release]
+lto = "thin"
+strip = true
+
+[profile.dev]
+debug = 0
+incremental = false
+
+[profile.test]
+debug = 0
+incremental = false

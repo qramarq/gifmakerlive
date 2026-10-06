@@ -1,0 +1,35 @@
+name: Rust and browser rebuild
+on: [push, pull_request]
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: cargo test --locked -p gifmaker-core
+      - run: cargo build --locked -p gifmaker-core
+      - run: cargo install weaveffi-cli --version 0.24.0 --locked
+      - run: weaveffi generate crates/gif-core/src/lib.rs && git diff --exit-code -- bindings
+      - run: pip install -r requirements.txt ./bindings/python httpx
+      - run: python -m unittest discover -s tests
+        env:
+          GIFMAKER_CORE_LIBRARY: ${{ github.workspace }}/target/debug/libgifmaker_core.so
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-10-05
+          targets: wasm32-unknown-unknown
+      - uses: actions/setup-python@v5
+      - run: cargo install wasm-bindgen-cli --version 0.2.121 --locked
+      - run: python scripts/build_web.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gifmaker-browser
+          path: dist

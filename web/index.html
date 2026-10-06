@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#141717"><title>GIF Maker Live — A little motion goes a long way.</title><link rel="stylesheet" href="studio.css"></head>
+<body>
+<header><a class="brand" href="/" aria-label="GIF Maker Live home"><span class="mark">g<span>↗</span></span>gifmaker<span class="muted">live</span></a><span class="local-label"><i></i> YOUR MOMENT, ON REPEAT</span><a href="https://github.com/qramarq/gifmakerlive" target="_blank" rel="noreferrer">Source ↗</a></header>
+<main>
+<div class="intro"><div><p class="eyebrow">THE LITTLE STUDIO FOR BIG REACTIONS</p><h1>A little motion.<br><span>A lot of personality.</span></h1><p>Drop a clip. Capture a moment. Make something worth repeating.</p></div><div class="loop-art" aria-hidden="true"><span>PLAY<br>IT<br>AGAIN.</span><b>↻</b></div></div>
+<section class="workspace" aria-label="GIF editor">
+<div class="source-panel"><div class="panel-top"><span class="eyebrow">01 / PICK YOUR MOMENT</span><div class="tabs"><button id="upload-tab" class="selected" type="button">Upload video</button><button id="camera-tab" type="button">Use camera</button></div></div>
+<div id="dropzone" class="preview"><div id="empty"><div class="upload-icon">↥</div><h2>Good moments start here.</h2><p>Drop your video into the studio</p><button id="browse" class="secondary" type="button">Choose a video <span>↗</span></button><small>MP4, MOV, WebM & more · Up to 100 MiB</small></div><video id="video" controls playsinline hidden></video><img id="gif" alt="Your looping GIF preview" hidden><span id="preview-tag" hidden>LIVE PREVIEW</span></div>
+<input id="file" type="file" accept=".mp4,.mov,.webm,.avi,.mkv,.m4v" hidden>
+<div class="source-footer"><span id="filename">No clip selected</span><button id="record" type="button" hidden>● Start recording</button><button id="replace" type="button" hidden>Replace clip</button></div>
+</div>
+<aside><iframe id="settings" src="settings.html" title="GIF output settings rendered by GPUI"></iframe><details id="advanced"><summary>Custom values & keyboard controls</summary><div class="custom"><label>Frames per second<input id="fps" type="number" min="1" max="30" value="10"></label><label>Width in pixels<input id="width" type="number" min="100" max="800" value="320"></label></div><p>Custom values override the preset buttons above.</p></details><div class="export-area"><button id="convert" class="primary" type="button" disabled>Create GIF <span>↗</span></button><a id="download" class="primary" hidden>Download GIF <span>↓</span></a><p id="status" role="status" aria-live="polite">Your next favorite loop is one clip away.</p></div></aside>
+</section>
+<footer><span>SHORT CLIPS. INFINITE POSSIBILITIES.</span><span>Videos are uploaded for conversion. <a href="privacy.html">How it works ↗</a></span></footer>
+</main><script type="module" src="studio.js"></script>
+</body></html>
