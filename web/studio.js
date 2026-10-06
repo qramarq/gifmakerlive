@@ -1,13 +1,41 @@
 const $ = id => document.getElementById(id);
-let clip, stream, recorder, sourceUrl, gifUrl, timer, busy = false, recordingBytes = 0, cameraRequest = 0;
+let clip, stream, recorder, sourceUrl, gifUrl, timer, busy = false, recordingBytes = 0;
+let imageMode = false, selectionVersion = 0;
 const MAX_BYTES = 100 * 1024 * 1024;
+function syncSettings() {
+  $('settings').contentWindow.postMessage({type:'gif-host-settings',fps:Number($('fps').value),width:Number($('width').value),duration:Number($('duration').value),imageMode},location.origin);
+}
+for (const id of ['fps','width','duration']) $(id).addEventListener('change',syncSettings);
+document.querySelectorAll('[data-prompt]').forEach(button => {button.onclick = () => {$('motion-prompt').value=button.dataset.prompt; $('motion-prompt').focus();};});
+$('animate-toggle').onchange = () => {
+  if (busy) return;
+  imageMode=$('animate-toggle').checked; selectionVersion++;
+  stopCamera(); clearResult(); clip=undefined;
+  if(sourceUrl) URL.revokeObjectURL(sourceUrl); sourceUrl=undefined;
+  $('video').removeAttribute('src'); $('still').removeAttribute('src');
+  $('video').hidden=$('still').hidden=true; $('empty').hidden=false;
+  $('workspace').classList.toggle('image-mode',imageMode); $('motion-panel').hidden=!imageMode;
+  $('camera-tab').hidden=imageMode; $('upload-tab').textContent=imageMode?'Upload image':'Upload video';
+  $('upload-tab').classList.add('selected'); $('camera-tab').classList.remove('selected');
+  $('file').accept=imageMode?'.png,.jpg,.jpeg,.webp':'.mp4,.mov,.webm,.avi,.mkv,.m4v';
+  $('drop-label').textContent=imageMode?'Drop a still image into the studio':'Drop your video into the studio';
+  $('browse').textContent=imageMode?'Choose an image ↗':'Choose a video ↗';
+  $('upload-hint').textContent=imageMode?'PNG, JPEG, WebP · Up to 20 MiB':'MP4, MOV, WebM & more · Up to 100 MiB';
+  $('replace').hidden=true; $('preview-tag').hidden=true;
+  $('replace').textContent=imageMode?'Replace image':'Replace clip';
+  $('filename').textContent=imageMode?'No image selected':'No clip selected';
+  $('convert').disabled=true; $('convert').textContent=imageMode?'Animate image ↗':'Create GIF ↗';
+  $('motion-prompt').required=imageMode;
+  status(imageMode?'Choose an image and describe its motion.':'Your next favorite loop is one clip away.');
+  syncSettings();
+};
 function status(message, error = false) { $('status').textContent = message; $('status').classList.toggle('error', error); }
 function clearResult() {
   if (gifUrl) URL.revokeObjectURL(gifUrl);
   gifUrl = undefined; $('gif').hidden = true; $('download').hidden = true; $('convert').hidden = false;
 }
 function stopCamera() {
-  cameraRequest++;
+  selectionVersion++;
   clearTimeout(timer);
   if (recorder?.state === 'recording') { recorder.onstop = null; recorder.stop(); }
   stream?.getTracks().forEach(track => track.stop()); stream = undefined;
@@ -15,16 +43,20 @@ function stopCamera() {
 }
 function selectFile(file) {
   if (busy || !file) return;
-  if (!/\.(mp4|mov|webm|avi|mkv|m4v)$/i.test(file.name)) return status('Choose an MP4, MOV, WebM, AVI, MKV or M4V video.', true);
-  if (!file.size || file.size > MAX_BYTES) return status('Choose a nonempty video smaller than 100 MiB.', true);
+  const supported=imageMode?/\.(png|jpe?g|webp)$/i:/\.(mp4|mov|webm|avi|mkv|m4v)$/i;
+  if (!supported.test(file.name)) return status(imageMode?'Choose a still PNG, JPEG, or WebP image.':'Choose an MP4, MOV, WebM, AVI, MKV or M4V video.', true);
+  if (!file.size || file.size > (imageMode?20*1024*1024:MAX_BYTES)) return status(imageMode?'Choose a nonempty image smaller than 20 MiB.':'Choose a nonempty video smaller than 100 MiB.', true);
+  selectionVersion++;
   stopCamera(); clearResult(); clip = file;
   if (sourceUrl) URL.revokeObjectURL(sourceUrl);
   sourceUrl = URL.createObjectURL(file);
-  const video = $('video'); video.src = sourceUrl; video.muted = false; video.controls = true; video.hidden = false;
+  const video = $('video'); video.hidden=imageMode; $('still').hidden=!imageMode;
+  if(imageMode) $('still').src=sourceUrl;
+  else {video.src = sourceUrl; video.muted = false; video.controls = true;}
   $('empty').hidden = true; $('preview-tag').hidden = true; $('replace').hidden = false;
   $('filename').textContent = `${file.name} · ${(file.size / 1024 / 1024).toFixed(1)} MiB`;
   $('convert').disabled = false; $('upload-tab').classList.add('selected'); $('camera-tab').classList.remove('selected');
-  status('Ready when you are. Pick your settings and create a GIF.');
+  status(imageMode?'Original loaded. Describe one motion, or choose an example.':'Ready when you are. Pick your settings and create a GIF.');
 }
 $('browse').onclick = $('replace').onclick = () => $('file').click();
 $('file').onchange = e => { selectFile(e.target.files[0]); e.target.value = ''; };
@@ -33,20 +65,22 @@ for (const event of ['dragenter', 'dragover']) $('dropzone').addEventListener(ev
 for (const event of ['dragleave', 'drop']) $('dropzone').addEventListener(event, e => {e.preventDefault(); $('dropzone').classList.remove('dragover');});
 $('dropzone').addEventListener('drop', e => selectFile(e.dataTransfer.files[0]));
 $('camera-tab').onclick = async () => {
-  if (busy || stream) return;
+  if (busy || stream || imageMode) return;
   if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) return status('Camera recording is unavailable in this browser. Upload a clip instead.', true);
-  const request = ++cameraRequest;
+  const version=++selectionVersion;
   try {
-    const candidate = await navigator.mediaDevices.getUserMedia({video: true, audio: false});
-    if (request !== cameraRequest) {candidate.getTracks().forEach(track => track.stop()); return;}
-    stream = candidate;
+    const camera=await navigator.mediaDevices.getUserMedia({video: true, audio: false});
+    if(version!==selectionVersion || imageMode || busy){camera.getTracks().forEach(track=>track.stop());return;}
+    stream = camera;
     clearResult(); clip = undefined; $('convert').disabled = true;
     $('video').srcObject = stream; $('video').muted = true; $('video').controls = false; $('video').hidden = false;
-    await $('video').play(); $('empty').hidden = true; $('record').hidden = false; $('replace').hidden = true;
+    await $('video').play();
+    if(version!==selectionVersion || imageMode || busy){camera.getTracks().forEach(track=>track.stop());return;}
+    $('empty').hidden = true; $('record').hidden = false; $('replace').hidden = true;
     $('preview-tag').hidden = false; $('record').textContent = '● Start recording';
     $('camera-tab').classList.add('selected'); $('upload-tab').classList.remove('selected');
     $('filename').textContent = 'Camera ready · 30-second limit'; status('Camera is ready. Start recording when you are.');
-  } catch (error) { if (request === cameraRequest) {stopCamera(); status('Camera access failed. Check your browser permission or upload a video.', true);} }
+  } catch (error) { if(version===selectionVersion){stopCamera(); status('Camera access failed. Check your browser permission or upload a video.', true);} }
 };
 $('record').onclick = () => {
   if (recorder?.state === 'recording') {recorder.stop(); return;}
@@ -64,35 +98,57 @@ $('record').onclick = () => {
 };
 window.addEventListener('message', event => {
   if(event.origin !== location.origin || event.source !== $('settings').contentWindow) return;
+  if(event.data?.type === 'gif-settings-ready') {syncSettings();return;}
   if(event.data?.type === 'gif-settings-unavailable') {$('advanced').open = true; return;}
-  const {type,fps,width} = event.data ?? {};
+  if(busy) return;
+  const {type,fps,width,duration} = event.data ?? {};
   if(type === 'gif-settings' && Number.isInteger(fps) && fps >= 1 && fps <= 30 && Number.isInteger(width) && width >= 100 && width <= 800) {
     $('fps').value = fps; $('width').value = width;
+    if(Number.isInteger(duration) && duration>=1 && duration<=6) $('duration').value=duration;
   }
 });
 $('convert').onclick = async () => {
   if(!clip || busy) return;
   if(!$('fps').reportValidity() || !$('width').reportValidity()) return;
+  if(imageMode && (!$('motion-prompt').reportValidity() || !$('duration').reportValidity())) return;
   busy = true; $('convert').disabled = true;
-  for(const id of ['camera-tab','upload-tab','replace','browse']) $(id).disabled = true;
-  clearResult(); $('video').pause(); status('Creating your loop… larger clips can take up to two minutes.');
+  const controls=['camera-tab','upload-tab','replace','browse','animate-toggle','motion-prompt','duration','original-size','fps','width'];
+  for(const id of controls) $(id).disabled = true;
+  document.querySelectorAll('[data-prompt]').forEach(button=>button.disabled=true);
+  $('settings').inert=true;
+  clearResult(); $('video').pause(); $('still').hidden=!imageMode; $('video').hidden=imageMode;
+  status(imageMode?'Rendering your original image into a loop…':'Creating your loop… larger clips can take up to two minutes.');
   const data = new FormData(); data.append('file',clip); data.append('fps',$('fps').value); data.append('width',$('width').value);
+  if(imageMode){data.append('prompt',$('motion-prompt').value.trim());data.append('duration',$('duration').value);data.append('original_size',$('original-size').checked);}
   try {
-    const response = await fetch('/convert', {method:'POST',body:data,signal:AbortSignal.timeout(150000)});
-    const result = await response.json().catch(() => ({}));
+    const response = await fetch(imageMode?'/animate':'/convert', {method:'POST',body:data,signal:AbortSignal.timeout(150000)});
+    let result = await response.json().catch(() => ({}));
     if(!response.ok) throw new Error(typeof result.detail === 'string' ? result.detail : 'Conversion failed. Try a shorter video.');
+    if(imageMode){
+      if(!/^[a-f0-9]{32}$/.test(result.job_id)) throw new Error('The server returned an invalid motion job.');
+      const jobId=result.job_id, deadline=Date.now()+300000;
+      while(true){
+        if(Date.now()>deadline) throw new Error('The render took too long. Please try a smaller image.');
+        const poll=await fetch(`/animate/${jobId}`,{signal:AbortSignal.timeout(15000)});
+        result=await poll.json();
+        if(!poll.ok || result.status==='failed') throw new Error(result.detail || 'This motion job is no longer available. Try again.');
+        if(result.status==='ready') break;
+        status(result.status==='queued'?'Your image is queued for rendering…':'Rendering your image with HyperFrames…');
+        await new Promise(resolve=>setTimeout(resolve,1000));
+      }
+    }
     if(!/^output_[a-f0-9]{8,32}\.gif$/.test(result.filename)) throw new Error('The server returned an invalid download.');
-    const download = await fetch(`/download/${encodeURIComponent(result.filename)}`);
+    const download = await fetch(`/download/${encodeURIComponent(result.filename)}`,{signal:AbortSignal.timeout(30000)});
     if(!download.ok) throw new Error('The GIF could not be downloaded. Please try again.');
     const blob = await download.blob();
     if (!blob.type.startsWith('image/gif')) throw new Error('The server did not return a GIF. Please try again.');
     gifUrl = URL.createObjectURL(blob);
-    $('gif').src = gifUrl; $('gif').hidden = false; $('video').hidden = true;
+    $('gif').src = gifUrl; $('gif').hidden = false; $('video').hidden = $('still').hidden = true;
     $('download').href = gifUrl; $('download').download = 'my-loop.gif'; $('download').hidden = false;
     // Keep conversion available to try a different recipe with the same source.
     $('convert').textContent = 'Create another version ↗';
     status(`Loop ready · Repeats continuously · ${(blob.size/1024).toFixed(1)} KB · ${result.fps} fps · ${result.width} px`);
   } catch(error) {status(error.name === 'TimeoutError' ? 'The server took too long. Try a shorter clip.' : error.message, true);}
-  finally {busy = false; $('convert').disabled = false; for(const id of ['camera-tab','upload-tab','replace','browse']) $(id).disabled = false;}
+  finally {busy = false; $('convert').disabled = false; for(const id of controls) $(id).disabled = false; document.querySelectorAll('[data-prompt]').forEach(button=>button.disabled=false); $('settings').inert=false;}
 };
 window.addEventListener('pagehide', () => {if(recorder) recorder.onstop = null; stopCamera(); if(sourceUrl) URL.revokeObjectURL(sourceUrl); if(gifUrl) URL.revokeObjectURL(gifUrl);});

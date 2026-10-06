@@ -96,7 +96,7 @@ GIFMAKER_CORE_API uint64_t gifmaker_core_debug_live(int32_t kind);
 /* Contract checksums, one per top-level module. A consumer compares
    each function's result with the constant it was generated against
    before making any other call. */
-#define GIFMAKER_CORE_GIF_CHECKSUM 0x8043e3cf4a8baf04ull
+#define GIFMAKER_CORE_GIF_CHECKSUM 0xecc5bc4232908a39ull
 GIFMAKER_CORE_API uint64_t gifmaker_core_gif_checksum(void);
 
 /*
@@ -125,12 +125,18 @@ typedef enum {
     /** Conversion exceeded the two minute limit. */
     gifmaker_core_gif_ConversionError_TimedOut = 5,
     /** The output could not be written. */
-    gifmaker_core_gif_ConversionError_OutputFailed = 6
+    gifmaker_core_gif_ConversionError_OutputFailed = 6,
+    /** Use one supported whole-image motion instruction. */
+    gifmaker_core_gif_ConversionError_UnsupportedMotion = 7
 } gifmaker_core_gif_ConversionError;
 
 // Module: gif
 /** Convert a server-owned local video into a looping, palette-optimized GIF. */
 GIFMAKER_CORE_API uint64_t gifmaker_core_gif_convert(const uint8_t* input_ptr, size_t input_len, const uint8_t* output_ptr, size_t output_len, int32_t fps, int32_t width, gifmaker_core_error* out_err);
+/** Resolve a bounded instruction to a safe motion plan; never returns executable code. */
+GIFMAKER_CORE_API const uint8_t* gifmaker_core_gif_plan_motion(const uint8_t* prompt_ptr, size_t prompt_len, size_t* out_len, gifmaker_core_error* out_err);
+/** Encode a server-owned, consecutive lossless PNG sequence without resizing it. */
+GIFMAKER_CORE_API uint64_t gifmaker_core_gif_encode_motion(const uint8_t* frames_ptr, size_t frames_len, const uint8_t* output_ptr, size_t output_len, int32_t fps, int32_t count, gifmaker_core_error* out_err);
 
 
 #ifdef __cplusplus

@@ -2,7 +2,34 @@
 
 A browser GIF studio with a GPUI WebAssembly settings panel and a Rust conversion core exposed through WeaveFFI 0.24.0. Upload a video or record your camera, choose FPS/width, preview and download a looping GIF.
 
-**Loop GIF is always enabled.** Every generated GIF embeds infinite playback, so previews and downloaded files repeat continuously without an extra setting.
+## Still-image motion
+
+**Loop GIF is always enabled.** Every generated GIF embeds infinite playback, so previews and downloaded files repeat continuously.
+
+Turn on **Animate a still image**, choose a PNG/JPEG/WebP, and type one motion:
+
+- `Gently float up and down`
+- `Pan left` or `Pan right`
+- `Zoom in and back out` or `Zoom out`
+- `Gently rotate clockwise` or `Rotate counterclockwise`
+
+GPUI provides FPS, output width, and image-loop duration presets; HTML controls provide keyboard input and a fallback when GPU rendering is unavailable. Duration is 1–6 seconds. Each motion returns to its starting point. This version animates the entire original image; it does not synthesize poses, segment subjects, repaint artwork, or accept arbitrary animation code. Unsupported/combined instructions return an actionable error instead of substituting a different motion.
+
+**Keep original image size** is on by default. Float and pan use integer-pixel translations. Transparent padding keeps the complete source inside the canvas. Zoom/rotation are only applied when explicitly requested; resizing to the selected width requires turning original size off. EXIF orientation is normalized once. HyperFrames 0.8.134 captures lossless RGBA PNG frames, then the Rust core calls FFmpeg directly on those frames with one global palette and no dithering. There is no lossy MP4/YUV intermediate. GIF limits output to 256 palette entries (one reserved for transparency) and binary transparency; photographic colors, soft alpha, resizing, zoom, and rotation cannot be pixel-identical to the source. No-dither output prioritizes stable pixels but can show banding on gradients.
+
+Images are limited to 20 MiB / 20 million decoded pixels. Rendered frames are bounded to 1800px per side and 120 million pixels across the whole loop. Oversized original-size requests fail with a suggestion to opt into resizing or reduce FPS/duration; the server never silently downsizes them.
+
+`POST /animate` accepts multipart `file`, `prompt`, `fps`, `width`, `duration`, and `original_size`, returning HTTP 202 with `job_id`. Poll `GET /animate/{job_id}` for queued/rendering/ready/failed status; ready jobs include the ordinary GIF `filename`. Four uploads/jobs may be pending, one image render runs at a time, and video conversion remains available. Job status lives in memory for ten minutes and requires a **single Uvicorn worker/service instance** (the supplied Docker default). Restarted/expired jobs return an actionable 404; horizontal scaling needs a shared job store. Rendering has a 100-second deadline that stops its process tree; the Rust encoder retains its separate 120-second deadline. Sources and intermediate PNG frames are deleted on success and handled failures.
+
+The image renderer needs Node 22+ (Docker uses 24), Chromium, FFmpeg and Pillow. After the ordinary Rust/Python setup below:
+
+```sh
+npm ci
+npx hyperframes browser ensure
+# Or set HYPERFRAMES_BROWSER_PATH to an installed Chrome Headless Shell executable (recommended on Windows).
+```
+
+The backend uses only the pinned local CLI/GSAP packages and disables update/skill checks, automatic installation, and telemetry for render jobs. Prompts never enter HTML, JavaScript, subprocess command text, or URLs. `/health` reports whether the motion packages and Node are installed; a successful integration render is the readiness check for Chromium/FFmpeg. Keep at least 1 GiB free for HyperFrames' preflight check, with additional space for the job's frames.
 
 ## Architecture
 
@@ -54,7 +81,7 @@ Tests require the native library environment variable and FFmpeg. They exercise 
 
 ## Deployment
 
-Netlify builds the Wasm UI and proxies `/convert`, `/download/*`, and `/health` to the existing Render service. The conversion backend must migrate from its current Python runtime to the supplied Docker image; a repository merge alone does not change an existing Render service's runtime. Deploy and verify the Docker backend before promoting the new UI. `/health` must report `engine: rust-weaveffi`.
+Netlify builds the Wasm UI and proxies `/convert`, `/animate`, `/animate/*`, `/download/*`, and `/health` to the existing Render service. The conversion backend must migrate from its current Python runtime to the supplied Docker image; a repository merge alone does not change an existing Render service's runtime. Deploy and verify the Docker backend before promoting the new UI. `/health` must report `engine: rust-weaveffi`.
 
 The Docker backend serves the browser host as well, but its GPU files are produced by the separate Netlify build. Camera capture needs HTTPS (or localhost). No production deployment is performed by the development scripts.
 

@@ -90,7 +90,7 @@ def _bind(name: str, restype: Any, *argtypes: Any) -> Any:
 # checksum of every top-level module: (module, checksum symbol, value).
 _ABI_VERSION = 3
 _CHECKSUMS: List[Tuple[str, str, int]] = [
-    ("gif", "gifmaker_core_gif_checksum", 0x8043e3cf4a8baf04),
+    ("gif", "gifmaker_core_gif_checksum", 0xecc5bc4232908a39),
 ]
 
 
@@ -532,6 +532,7 @@ class ConversionError(Error):
     EncodingFailed: "Type[EncodingFailed]"
     TimedOut: "Type[TimedOut]"
     OutputFailed: "Type[OutputFailed]"
+    UnsupportedMotion: "Type[UnsupportedMotion]"
 
 
 class InvalidOptions(ConversionError):
@@ -588,12 +589,22 @@ class OutputFailed(ConversionError):
         super().__init__(6, message)
 
 
+class UnsupportedMotion(ConversionError):
+    """Use one supported whole-image motion instruction."""
+
+    CODE = 7
+
+    def __init__(self, message: str = "Use one supported whole-image motion instruction.") -> None:
+        super().__init__(7, message)
+
+
 ConversionError.InvalidOptions = InvalidOptions
 ConversionError.InvalidInput = InvalidInput
 ConversionError.EncoderUnavailable = EncoderUnavailable
 ConversionError.EncodingFailed = EncodingFailed
 ConversionError.TimedOut = TimedOut
 ConversionError.OutputFailed = OutputFailed
+ConversionError.UnsupportedMotion = UnsupportedMotion
 
 
 _CONVERSION_ERROR_CODES: Dict[int, Any] = {
@@ -603,6 +614,7 @@ _CONVERSION_ERROR_CODES: Dict[int, Any] = {
     4: EncodingFailed,
     5: TimedOut,
     6: OutputFailed,
+    7: UnsupportedMotion,
 }
 
 
@@ -636,6 +648,44 @@ def convert(input: str, output: str, fps: int, width: int) -> int:
     _output_b = output.encode("utf-8")
     _err = _ErrorStruct()
     _ret = _c_gif_convert(_input_b, len(_input_b), _output_b, len(_output_b), fps, width, ctypes.byref(_err))
+    _check_conversion_error(_err)
+    return _ret
+
+
+_c_gif_plan_motion = _bind("gifmaker_core_gif_plan_motion", ctypes.c_void_p, ctypes.c_char_p, ctypes.c_size_t, ctypes.POINTER(ctypes.c_size_t), ctypes.POINTER(_ErrorStruct))
+
+
+def plan_motion(prompt: str) -> str:
+    """Resolve a bounded instruction to a safe motion plan; never returns executable code.
+
+    Raises
+    ------
+    ConversionError
+        If the call reports one of the domain's error codes.
+    """
+    _prompt_b = prompt.encode("utf-8")
+    _err = _ErrorStruct()
+    _out_len = ctypes.c_size_t()
+    _ret = _c_gif_plan_motion(_prompt_b, len(_prompt_b), ctypes.byref(_out_len), ctypes.byref(_err))
+    _check_conversion_error(_err)
+    return _take_str(_ret, _out_len.value)
+
+
+_c_gif_encode_motion = _bind("gifmaker_core_gif_encode_motion", ctypes.c_uint64, ctypes.c_char_p, ctypes.c_size_t, ctypes.c_char_p, ctypes.c_size_t, ctypes.c_int32, ctypes.c_int32, ctypes.POINTER(_ErrorStruct))
+
+
+def encode_motion(frames: str, output: str, fps: int, count: int) -> int:
+    """Encode a server-owned, consecutive lossless PNG sequence without resizing it.
+
+    Raises
+    ------
+    ConversionError
+        If the call reports one of the domain's error codes.
+    """
+    _frames_b = frames.encode("utf-8")
+    _output_b = output.encode("utf-8")
+    _err = _ErrorStruct()
+    _ret = _c_gif_encode_motion(_frames_b, len(_frames_b), _output_b, len(_output_b), fps, count, ctypes.byref(_err))
     _check_conversion_error(_err)
     return _ret
 

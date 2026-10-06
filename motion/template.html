@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Image motion</title>
+  <script src="gsap.min.js"></script>
+  <style>
+    html, body { margin: 0; background: transparent; }
+    #motion { position: relative; width: {{WIDTH}}px; height: {{HEIGHT}}px; overflow: hidden; }
+    .clip { position: absolute; inset: 0; }
+    #original { position: absolute; display: block; left: {{LEFT}}px; top: {{TOP}}px;
+      width: {{IMAGE_WIDTH}}px; height: {{IMAGE_HEIGHT}}px; transform-origin: center; }
+  </style>
+</head>
+<body>
+  <div id="motion" data-composition-id="motion" data-width="{{WIDTH}}" data-height="{{HEIGHT}}" data-duration="{{DURATION}}" data-fps="{{FPS}}">
+    <img id="original" class="clip" data-start="0" data-duration="{{DURATION}}" data-track-index="0" src="source.png" alt="Original uploaded image">
+  </div>
+  <script>
+    window.__timelines = window.__timelines || {};
+    const tl = gsap.timeline({ paused: true });
+    tl.to('#original', { ...{{TRANSFORM}}, duration: {{DURATION}} / 2,
+      ease: 'sine.inOut', repeat: 1, yoyo: true, force3D: false, snap: { x: 1, y: 1 } });
+    window.__timelines['motion'] = tl;
+  </script>
+</body>
+</html>

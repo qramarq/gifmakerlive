@@ -30,3 +30,5 @@ web/fonts/
 .weaveffi-cache/
 build/
 *.egg-info/
+node_modules/
+.motion-jobs/
