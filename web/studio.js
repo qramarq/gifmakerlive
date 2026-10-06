@@ -101,17 +101,19 @@ window.addEventListener('message', event => {
   if(event.data?.type === 'gif-settings-ready') {syncSettings();return;}
   if(event.data?.type === 'gif-settings-unavailable') {$('advanced').open = true; return;}
   if(busy) return;
-  const {type,fps,width,duration} = event.data ?? {};
-  if(type === 'gif-settings' && Number.isInteger(fps) && fps >= 1 && fps <= 30 && Number.isInteger(width) && width >= 100 && width <= 800) {
-    $('fps').value = fps; $('width').value = width;
-    if(Number.isInteger(duration) && duration>=1 && duration<=6) $('duration').value=duration;
+  const {type,setting,fps,width,duration} = event.data ?? {};
+  if(type === 'gif-settings') {
+    if(setting==='fps' && Number.isInteger(fps) && fps>=1 && fps<=30) $('fps').value=fps;
+    if(setting==='width' && Number.isInteger(width) && width>=100 && width<=800) $('width').value=width;
+    if(setting==='duration' && Number.isInteger(duration) && duration>=1 && duration<=6) $('duration').value=duration;
+    syncSettings();
   }
 });
 $('convert').onclick = async () => {
   if(!clip || busy) return;
   if(!$('fps').reportValidity() || !$('width').reportValidity()) return;
   if(imageMode && (!$('motion-prompt').reportValidity() || !$('duration').reportValidity())) return;
-  busy = true; $('convert').disabled = true;
+  selectionVersion++; busy = true; $('convert').disabled = true;
   const controls=['camera-tab','upload-tab','replace','browse','animate-toggle','motion-prompt','duration','original-size','fps','width'];
   for(const id of controls) $(id).disabled = true;
   document.querySelectorAll('[data-prompt]').forEach(button=>button.disabled=true);
@@ -151,4 +153,4 @@ $('convert').onclick = async () => {
   } catch(error) {status(error.name === 'TimeoutError' ? 'The server took too long. Try a shorter clip.' : error.message, true);}
   finally {busy = false; $('convert').disabled = false; for(const id of controls) $(id).disabled = false; document.querySelectorAll('[data-prompt]').forEach(button=>button.disabled=false); $('settings').inert=false;}
 };
-window.addEventListener('pagehide', () => {if(recorder) recorder.onstop = null; stopCamera(); if(sourceUrl) URL.revokeObjectURL(sourceUrl); if(gifUrl) URL.revokeObjectURL(gifUrl);});
+window.addEventListener('pagehide', event => {if(recorder) recorder.onstop = null; stopCamera(); if(!event.persisted){if(sourceUrl) URL.revokeObjectURL(sourceUrl); if(gifUrl) URL.revokeObjectURL(gifUrl);}});

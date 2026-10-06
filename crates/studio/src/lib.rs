@@ -3,10 +3,10 @@ use std::{borrow::Cow, cell::RefCell};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(
-    inline_js = "export function settings(fps,width,duration){parent.postMessage({type:'gif-settings',fps,width,duration},location.origin)}"
+    inline_js = "export function settings(setting,fps,width,duration){parent.postMessage({type:'gif-settings',setting,fps,width,duration},location.origin)}"
 )]
 extern "C" {
-    fn settings(fps: i32, width: i32, duration: i32);
+    fn settings(setting: &str, fps: i32, width: i32, duration: i32);
 }
 
 thread_local! {
@@ -72,20 +72,20 @@ impl Render for Studio {
             .child(div().text_sm().text_color(rgb(0x9fa8a5)).child("Find the sweet spot between smooth motion and a smaller file."))
             .child(div().mt_1().text_sm().child("Frame rate"))
             .child(div().flex().gap_2()
-                .child(self.choice("fps-10", "10 fps".into(), self.fps == 10).on_click(cx.listener(|s, _, _, cx| {s.fps=10; settings(s.fps,s.width,s.duration); cx.notify();})))
-                .child(self.choice("fps-15", "15 fps".into(), self.fps == 15).on_click(cx.listener(|s, _, _, cx| {s.fps=15; settings(s.fps,s.width,s.duration); cx.notify();})))
-                .child(self.choice("fps-24", "24 fps".into(), self.fps == 24).on_click(cx.listener(|s, _, _, cx| {s.fps=24; settings(s.fps,s.width,s.duration); cx.notify();}))))
+                .child(self.choice("fps-10", "10 fps".into(), self.fps == 10).on_click(cx.listener(|s, _, _, cx| {s.fps=10; settings("fps",s.fps,s.width,s.duration); cx.notify();})))
+                .child(self.choice("fps-15", "15 fps".into(), self.fps == 15).on_click(cx.listener(|s, _, _, cx| {s.fps=15; settings("fps",s.fps,s.width,s.duration); cx.notify();})))
+                .child(self.choice("fps-24", "24 fps".into(), self.fps == 24).on_click(cx.listener(|s, _, _, cx| {s.fps=24; settings("fps",s.fps,s.width,s.duration); cx.notify();}))))
             .child(div().text_sm().child("Output width"))
             .child(div().flex().gap_2()
-                .child(self.choice("width-320", "320 px".into(), self.width == 320).on_click(cx.listener(|s, _, _, cx| {s.width=320; settings(s.fps,s.width,s.duration); cx.notify();})))
-                .child(self.choice("width-480", "480 px".into(), self.width == 480).on_click(cx.listener(|s, _, _, cx| {s.width=480; settings(s.fps,s.width,s.duration); cx.notify();})))
-                .child(self.choice("width-720", "720 px".into(), self.width == 720).on_click(cx.listener(|s, _, _, cx| {s.width=720; settings(s.fps,s.width,s.duration); cx.notify();}))))
+                .child(self.choice("width-320", "320 px".into(), self.width == 320).on_click(cx.listener(|s, _, _, cx| {s.width=320; settings("width",s.fps,s.width,s.duration); cx.notify();})))
+                .child(self.choice("width-480", "480 px".into(), self.width == 480).on_click(cx.listener(|s, _, _, cx| {s.width=480; settings("width",s.fps,s.width,s.duration); cx.notify();})))
+                .child(self.choice("width-720", "720 px".into(), self.width == 720).on_click(cx.listener(|s, _, _, cx| {s.width=720; settings("width",s.fps,s.width,s.duration); cx.notify();}))))
             .when(self.image_mode, |view| view
                 .child(div().text_sm().child("Image loop duration"))
                 .child(div().flex().gap_2()
-                    .child(self.choice("duration-2", "2 sec".into(), self.duration == 2).on_click(cx.listener(|s, _, _, cx| {s.duration=2; settings(s.fps,s.width,s.duration); cx.notify();})))
-                    .child(self.choice("duration-4", "4 sec".into(), self.duration == 4).on_click(cx.listener(|s, _, _, cx| {s.duration=4; settings(s.fps,s.width,s.duration); cx.notify();})))
-                    .child(self.choice("duration-6", "6 sec".into(), self.duration == 6).on_click(cx.listener(|s, _, _, cx| {s.duration=6; settings(s.fps,s.width,s.duration); cx.notify();})))))
+                    .child(self.choice("duration-2", "2 sec".into(), self.duration == 2).on_click(cx.listener(|s, _, _, cx| {s.duration=2; settings("duration",s.fps,s.width,s.duration); cx.notify();})))
+                    .child(self.choice("duration-4", "4 sec".into(), self.duration == 4).on_click(cx.listener(|s, _, _, cx| {s.duration=4; settings("duration",s.fps,s.width,s.duration); cx.notify();})))
+                    .child(self.choice("duration-6", "6 sec".into(), self.duration == 6).on_click(cx.listener(|s, _, _, cx| {s.duration=6; settings("duration",s.fps,s.width,s.duration); cx.notify();})))))
             .child(div().mt_1().p_4().rounded_lg().bg(rgb(0x242a23))
                 .child(div().text_sm().text_color(rgb(0xc2f970)).child("Made to loop."))
                 .child(div().mt_2().text_sm().text_color(rgb(0xb3bcb6)).child(if self.image_mode { "Original artwork. Stable colors. Width applies when original size is off." } else { "Original aspect ratio. Optimized colors. Endless playback." })))

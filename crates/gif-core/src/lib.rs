@@ -79,9 +79,27 @@ fn encode(input: &str, output: &str, fps: i32, width: i32) -> Result<u64, gif::C
     if !meta.is_file() || meta.len() == 0 || meta.len() > 100 * 1024 * 1024 {
         return Err(E::InvalidInput);
     }
-    let filter = format!(
-        "fps={fps},scale={width}:-1:flags=lanczos,split[a][b];[a]palettegen[p];[b][p]paletteuse"
-    );
+    let deadline = Instant::now() + Duration::from_secs(120);
+    let palette = tempfile::Builder::new()
+        .suffix(".png")
+        .tempfile()
+        .map_err(|_| E::OutputFailed)?;
+    let palette_filter = format!("fps={fps},scale={width}:-1:flags=lanczos,palettegen");
+    let mut palette_command = Command::new("ffmpeg");
+    palette_command.args([
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-nostdin",
+        "-y",
+        "-i",
+        input,
+        "-vf",
+        &palette_filter,
+    ]);
+    run_command_until(palette_command.arg(palette.path()), deadline)?;
+
+    let filter = format!("fps={fps},scale={width}:-1:flags=lanczos[x];[x][1:v]paletteuse[out]");
     let mut command = Command::new("ffmpeg");
     command.args([
         "-hide_banner",
@@ -91,17 +109,30 @@ fn encode(input: &str, output: &str, fps: i32, width: i32) -> Result<u64, gif::C
         "-y",
         "-i",
         input,
+        "-i",
+    ]);
+    command.arg(palette.path()).args([
         "-filter_complex",
         &filter,
+        "-map",
+        "[out]",
         "-loop",
         "0",
         "-f",
         "gif",
     ]);
-    encode_command(command, output)
+    encode_command_until(command, output, deadline)
 }
 
-fn encode_command(mut command: Command, output: &str) -> Result<u64, gif::ConversionError> {
+fn encode_command(command: Command, output: &str) -> Result<u64, gif::ConversionError> {
+    encode_command_until(command, output, Instant::now() + Duration::from_secs(120))
+}
+
+fn encode_command_until(
+    mut command: Command,
+    output: &str,
+    deadline: Instant,
+) -> Result<u64, gif::ConversionError> {
     use gif::ConversionError as E;
     let output = std::path::Path::new(output);
     let parent = output
@@ -113,34 +144,7 @@ fn encode_command(mut command: Command, output: &str) -> Result<u64, gif::Conver
         .suffix(".gif")
         .tempfile_in(parent)
         .map_err(|_| E::OutputFailed)?;
-    let mut child = command
-        .arg(temp.path())
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .map_err(|_| E::EncoderUnavailable)?;
-    let deadline = Instant::now() + Duration::from_secs(120);
-    loop {
-        match child.try_wait() {
-            Ok(Some(status)) => {
-                if !status.success() {
-                    return Err(E::EncodingFailed);
-                }
-                break;
-            }
-            Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(50)),
-            result => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err(if result.is_err() {
-                    E::EncodingFailed
-                } else {
-                    E::TimedOut
-                });
-            }
-        }
-    }
+    run_command_until(command.arg(temp.path()), deadline)?;
     let mut header = [0; 6];
     std::fs::File::open(temp.path())
         .and_then(|mut file| file.read_exact(&mut header))
@@ -156,6 +160,36 @@ fn encode_command(mut command: Command, output: &str) -> Result<u64, gif::Conver
     temp.persist_noclobber(output)
         .map_err(|_| E::OutputFailed)?;
     Ok(bytes)
+}
+
+fn run_command_until(command: &mut Command, deadline: Instant) -> Result<(), gif::ConversionError> {
+    use gif::ConversionError as E;
+    let mut child = command
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|_| E::EncoderUnavailable)?;
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                if !status.success() {
+                    return Err(E::EncodingFailed);
+                }
+                return Ok(());
+            }
+            Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(50)),
+            result => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(if result.is_err() {
+                    E::EncodingFailed
+                } else {
+                    E::TimedOut
+                });
+            }
+        }
+    }
 }
 
 weaveffi::export_runtime!();
