@@ -1,0 +1,63 @@
+name: Rust and browser rebuild
+on: [push, pull_request]
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npx hyperframes browser ensure
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: cargo test --locked -p gifmaker-core
+      - run: cargo build --locked -p gifmaker-core
+      - run: cargo install weaveffi-cli --version 0.24.0 --locked
+      - run: weaveffi generate crates/gif-core/src/lib.rs && git diff --exit-code -- bindings
+      - run: pip install -r requirements.txt ./bindings/python httpx
+      - run: python -m unittest discover -s tests
+        env:
+          GIFMAKER_CORE_LIBRARY: ${{ github.workspace }}/target/debug/libgifmaker_core.so
+          DO_NOT_TRACK: '1'
+      - name: Image motion browser flow against the real backend
+        env:
+          GIFMAKER_CORE_LIBRARY: ${{ github.workspace }}/target/debug/libgifmaker_core.so
+          GIFMAKER_TEST_GPU_FALLBACK: '1'
+          GIFMAKER_TEST_URL: http://127.0.0.1:8776
+          GIFMAKER_TEST_IMAGE: /tmp/motion-fixture.png
+          GIFMAKER_SCREENSHOT: ${{ runner.temp }}/motion-browser.png
+          DO_NOT_TRACK: '1'
+        run: |
+          export GIFMAKER_TEST_BROWSER="$(npx hyperframes browser path)"
+          python -c "from PIL import Image, ImageDraw; im=Image.new('RGB',(320,200),(28,48,72)); ImageDraw.Draw(im).rectangle((40,40,120,120),fill=(245,73,81)); im.save('/tmp/motion-fixture.png')"
+          uvicorn app:app --host 127.0.0.1 --port 8776 &
+          server=$!
+          trap 'kill "$server"' EXIT
+          python -c "import time, urllib.request; time.sleep(2); urllib.request.urlopen('http://127.0.0.1:8776/health')"
+          node tests/browser-motion.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: motion-browser-check
+          path: ${{ runner.temp }}/motion-browser*.png
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-10-05
+          targets: wasm32-unknown-unknown
+      - uses: actions/setup-python@v5
+      - run: cargo install wasm-bindgen-cli --version 0.2.121 --locked
+      - run: python scripts/build_web.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gifmaker-browser
+          path: dist

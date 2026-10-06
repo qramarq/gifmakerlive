@@ -1,0 +1,7 @@
+target
+.git
+.venv
+uploads
+output
+dist
+node_modules
