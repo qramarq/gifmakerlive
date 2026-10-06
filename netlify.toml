@@ -3,6 +3,18 @@
   publish = "dist"
 
 [[redirects]]
+  from = "/animate"
+  to = "https://gifmakerlive.onrender.com/animate"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/animate/*"
+  to = "https://gifmakerlive.onrender.com/animate/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/convert"
   to = "https://gifmakerlive.onrender.com/convert"
   status = 200
@@ -19,4 +31,3 @@
   to = "https://gifmakerlive.onrender.com/health"
   status = 200
   force = true
-

@@ -1,5 +1,6 @@
 //! Native conversion boundary. The HTTP adapter owns upload/output paths.
 use std::{io::Read, process::{Command, Stdio}, time::{Duration, Instant}};
+mod motion;
 
 #[weaveffi::module]
 pub mod gif {
@@ -18,6 +19,8 @@ pub mod gif {
         TimedOut = 5,
         /// The output could not be written.
         OutputFailed = 6,
+        /// Use one supported whole-image motion instruction.
+        UnsupportedMotion = 7,
     }
 
     impl std::fmt::Display for ConversionError {
@@ -29,6 +32,7 @@ pub mod gif {
                 Self::EncodingFailed => "Unable to decode this video or create its GIF",
                 Self::TimedOut => "Conversion exceeded two minutes; try a shorter video",
                 Self::OutputFailed => "Unable to save the GIF",
+                Self::UnsupportedMotion => "Try one whole-image instruction: float up and down, pan left, pan right, zoom in, zoom out, or rotate clockwise. Subject animation and combined instructions are not supported yet.",
             })
         }
     }
@@ -41,6 +45,18 @@ pub mod gif {
         }
         super::encode(&input, &output, fps, width)
     }
+
+    /// Resolve a bounded instruction to a safe motion plan; never returns executable code.
+    #[weaveffi::export]
+    pub fn plan_motion(prompt: String) -> Result<String, ConversionError> {
+        super::motion::plan(&prompt)
+    }
+
+    /// Encode a server-owned, consecutive lossless PNG sequence without resizing it.
+    #[weaveffi::export]
+    pub fn encode_motion(frames: String, output: String, fps: i32, count: i32) -> Result<u64, ConversionError> {
+        super::motion::encode(&frames, &output, fps, count)
+    }
 }
 
 fn encode(input: &str, output: &str, fps: i32, width: i32) -> Result<u64, gif::ConversionError> {
@@ -49,14 +65,20 @@ fn encode(input: &str, output: &str, fps: i32, width: i32) -> Result<u64, gif::C
     if !meta.is_file() || meta.len() == 0 || meta.len() > 100 * 1024 * 1024 {
         return Err(E::InvalidInput);
     }
+    let filter = format!("fps={fps},scale={width}:-1:flags=lanczos,split[a][b];[a]palettegen[p];[b][p]paletteuse");
+    let mut command = Command::new("ffmpeg");
+    command.args(["-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-i", input,
+            "-filter_complex", &filter, "-loop", "0", "-f", "gif"]);
+    encode_command(command, output)
+}
+
+fn encode_command(mut command: Command, output: &str) -> Result<u64, gif::ConversionError> {
+    use gif::ConversionError as E;
     let output = std::path::Path::new(output);
     let parent = output.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(std::path::Path::new("."));
     // Encode into a same-directory temporary file; failed jobs never expose partial GIFs.
     let temp = tempfile::Builder::new().suffix(".gif").tempfile_in(parent).map_err(|_| E::OutputFailed)?;
-    let filter = format!("fps={fps},scale={width}:-1:flags=lanczos,split[a][b];[a]palettegen[p];[b][p]paletteuse");
-    let mut child = Command::new("ffmpeg")
-        .args(["-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-i", input,
-            "-filter_complex", &filter, "-loop", "0", "-f", "gif"])
+    let mut child = command
         .arg(temp.path()).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null())
         .spawn().map_err(|_| E::EncoderUnavailable)?;
     let deadline = Instant::now() + Duration::from_secs(120);

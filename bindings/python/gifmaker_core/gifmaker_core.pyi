@@ -24,6 +24,7 @@ class ConversionError(Error):
     EncodingFailed: Type["EncodingFailed"]
     TimedOut: Type["TimedOut"]
     OutputFailed: Type["OutputFailed"]
+    UnsupportedMotion: Type["UnsupportedMotion"]
     def __init__(self, code: int, message: str) -> None: ...
 
 # FPS must be 1–30 and width must be 100–800 pixels.
@@ -56,7 +57,18 @@ class OutputFailed(ConversionError):
     CODE: int
     def __init__(self, message: str = ...) -> None: ...
 
+# Use one supported whole-image motion instruction.
+class UnsupportedMotion(ConversionError):
+    CODE: int
+    def __init__(self, message: str = ...) -> None: ...
+
 # Convert a server-owned local video into a looping, palette-optimized GIF.
 def convert(input: str, output: str, fps: int, width: int) -> int: ...
+
+# Resolve a bounded instruction to a safe motion plan; never returns executable code.
+def plan_motion(prompt: str) -> str: ...
+
+# Encode a server-owned, consecutive lossless PNG sequence without resizing it.
+def encode_motion(frames: str, output: str, fps: int, count: int) -> int: ...
 
 # END gifmaker_core.pyi
