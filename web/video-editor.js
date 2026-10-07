@@ -7,14 +7,18 @@ export function createVideoEditor(video, panel, onEdit) {
   const cropInputs = [...panel.querySelectorAll('[data-crop]')];
   const summary = panel.querySelector('#edit-summary');
   const preview = panel.querySelector('#preview-edit');
+  const grid = panel.querySelector('#show-grid');
+  const tips = panel.querySelector('#show-tips');
+  grid.onchange = draw;
+  tips.onchange = () => { panel.querySelector('#editing-tips').hidden = !tips.checked; };
   function crop() { return cropInputs.map(input => Number(input.value)); }
   function valid() {
     const total = segments.reduce((sum, [start, end]) => sum + end - start, 0);
     const [x, y, w, h] = crop();
-    const ok = segments.length > 0 && segments.every(([start, end]) =>
+    const ok = duration <= 30.05 && segments.length > 0 && segments.every(([start, end]) =>
       Number.isFinite(start) && Number.isFinite(end) && start >= 0 && end > start && (!duration || end <= duration + .001)) &&
       total <= 5 + 1e-9 && cropInputs.every(input => input.validity.valid) && x + w <= 100 && y + h <= 100;
-    summary.textContent = ok ? `${total.toFixed(2)} / 5 seconds · Segments play in listed order` : 'Use valid segments totaling up to 5 seconds and a crop inside the video.';
+    summary.textContent = duration > 30.05 ? 'Source video exceeds 30 seconds. Choose a shorter video.' : ok ? `${total.toFixed(2)} / 5 seconds · Segments play in listed order` : 'Use valid segments totaling up to 5 seconds and a crop inside the video.';
     summary.classList.toggle('error', !ok);
     preview.disabled = !ok;
     return ok;
@@ -26,6 +30,15 @@ export function createVideoEditor(video, panel, onEdit) {
     const sw = video.videoWidth * w / 100, sh = video.videoHeight * h / 100;
     canvas.width = Math.min(640, sw); canvas.height = Math.min(640, sw) * sh / sw;
     context.drawImage(video, video.videoWidth * x / 100, video.videoHeight * y / 100, sw, sh, 0, 0, canvas.width, canvas.height);
+    if (grid.checked) {
+      context.beginPath();
+      for (const fraction of [1 / 3, 2 / 3]) {
+        context.moveTo(canvas.width * fraction, 0); context.lineTo(canvas.width * fraction, canvas.height);
+        context.moveTo(0, canvas.height * fraction); context.lineTo(canvas.width, canvas.height * fraction);
+      }
+      context.strokeStyle = '#0009'; context.lineWidth = 3; context.stroke();
+      context.strokeStyle = '#ffffffe6'; context.lineWidth = 1; context.stroke();
+    }
   }
   function changed() { playing = false; video.pause(); valid(); draw(); onEdit(); }
   function render() {

@@ -72,6 +72,29 @@ class VideoEditTests(unittest.TestCase):
                 self.assertLessEqual(duration, 5010)  # GIF delays have centisecond precision.
                 self.assertGreaterEqual(duration, 4990)
 
+    def test_thirty_second_source_and_late_selection(self):
+        for seconds, expected in [(30, 200), (31, 422)]:
+            source = self.root / f'long-{seconds}.mp4'
+            subprocess.run(['ffmpeg', '-v', 'error', '-stream_loop', '-1', '-i', str(self.source),
+                            '-t', str(seconds), '-pix_fmt', 'yuv420p', str(source)], check=True)
+            with patch.object(self, 'source', source):
+                response, gif = self.request({'segments': [[25, 27], [27, 30]], 'crop': [0, 0, 50, 100]})
+            self.assertEqual(response.status_code, expected, response.text)
+            if gif:
+                self.assertEqual(gif.size, (100, 125))
+                self.assertEqual(sum(frame.info['duration'] for frame in ImageSequence.Iterator(gif)), 5000)
+            else:
+                self.assertIn('30 seconds', response.text)
+
+    def test_recording_without_duration_metadata(self):
+        source = self.root / 'recording.webm'
+        subprocess.run(['ffmpeg', '-v', 'error', '-i', str(self.source), '-t', '1',
+                        '-c:v', 'libvpx', '-f', 'webm', '-live', '1', str(source)], check=True)
+        with patch.object(self, 'source', source):
+            response, gif = self.request({'segments': [[0, 5]]})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(sum(frame.info['duration'] for frame in ImageSequence.Iterator(gif)), 1000)
+
     def test_invalid_edits_rejected_and_cleaned(self):
         for edits in [
             {'segments': [[0, 5.01]]}, {'segments': [[0, 3], [1, 4]]},

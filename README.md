@@ -96,12 +96,18 @@ See [design references](docs/design.md) for modern styling options. The original
 Upload a video or record your camera, then use **Trim, splice & crop** before creating a GIF:
 
 - Set segment start/end times in seconds. Add segments at the playhead to join multiple cuts in listed order (up to ten segments).
-- Keep the combined selection at or below **5 seconds**. Longer source videos are supported within the existing 100 MiB upload limit; the initial selection is the first five seconds.
+- Keep the combined selection at or below **5 seconds**. Source videos up to 30 seconds are supported within the existing 100 MiB upload limit; the initial selection is the first five seconds.
 - Set crop left/top/width/height as percentages of the displayed video. The crop preview updates locally; **Play edited selection** previews the cuts in order. Output width is applied after cropping.
 - Reset edits to return to the initial selection and full frame. Changing edits clears the previous GIF so you can generate a new version.
 
-`POST /convert` accepts an optional `edits` JSON form field, for example `{"segments":[[0,2],[3,6]],"crop":[0,0,50,100]}`. The example joins five seconds and keeps the left half of the frame. Without edits, conversion uses the first five seconds (or the whole video if shorter). Image animation is unchanged. Browser codec support determines whether a source can be previewed; server-side FFmpeg still handles supported uploads. Recordings without duration metadata start with a five-second selection; shorten it manually for shorter recordings.
+`POST /convert` accepts an optional `edits` JSON form field, for example `{"segments":[[0,2],[3,6]],"crop":[0,0,50,100]}`. The example joins five seconds and keeps the left half of the frame. Without edits, conversion uses the first five seconds (or the whole video if shorter). Image animation is unchanged. Browser codec support determines whether a source can be previewed; server-side FFmpeg still handles supported uploads. Recordings without duration metadata start with a five-second selection; the backend fits that default selection to shorter recordings.
 
 The HTTP adapter uses bounded FFprobe/FFmpeg preparation, then the existing Rust/WeaveFFI encoder creates the looping GIF. Preparation removes audio, applies cuts before cropping, and deletes its lossless temporary video on success or failure. Deploy the updated backend and frontend together; the Docker image includes `video_edits.py`.
 
 Validation: `python -m unittest discover -s tests -p test_video_edits.py -v` checks real frame colors, segment order, crop dimensions, five-second timing, invalid edits, and cleanup. `node tests/browser-video.cjs` checks the real browser upload/edit/download flow and mobile layout (set `GIFMAKER_TEST_URL` and optionally `GIFMAKER_TEST_BROWSER`). Both run in the existing CI workflow.
+
+### Optional editing guides
+
+Toggle **Crop grid** to overlay rule-of-thirds lines on the crop preview, and **Editing tips** to show or hide instructions. The toggles are independent and keep your current segments, crop, and generated GIF intact. Guides are preview-only and are never sent to the encoder. Grid starts off; tips start on. Toggle choices last while the page stays open, including source replacement and switching modes.
+
+Source videos may be up to **30 seconds** (and 100 MiB), while the joined GIF selection stays at **five seconds**. Select any portion of that source, including its final five seconds. The backend rejects longer sources even if the requested selection is short. For recordings missing duration metadata, it checks video packet timestamps before encoding and fits the default five-second selection to shorter recordings. A 50 ms duration tolerance accommodates container rounding.

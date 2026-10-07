@@ -67,10 +67,28 @@ def convert(source, destination, fps, width, raw):
         duration = float(stream.get("duration") or probe.get("format", {}).get("duration", 0))
     except (ValueError, TypeError):
         duration = 0
-    # Some browser recordings omit duration. Explicit edits can still be decoded;
-    # unedited recordings are bounded to the first five seconds by the filter.
+    # Browser WebM recordings may omit duration metadata. Inspect only the first
+    # 31 seconds of video packets to enforce the source limit in that case.
+    inferred_duration = not math.isfinite(duration) or duration <= 0
+    if inferred_duration:
+        packets = json.loads(run(["ffprobe", "-v", "error", "-select_streams", "v:0",
+                                  "-read_intervals", "%31", "-show_entries",
+                                  "packet=pts_time,duration_time", "-of", "json", str(source)]))
+        try:
+            times = [(float(packet["pts_time"]), float(packet.get("duration_time", 0)))
+                     for packet in packets.get("packets", []) if "pts_time" in packet]
+            if not times or any(not math.isfinite(t) or not math.isfinite(d) for t, d in times):
+                raise ValueError()
+            duration = max(t + d for t, d in times) - min(t for t, _ in times)
+        except (ValueError, TypeError):
+            raise EditError("Unable to determine the video length. Try an MP4 video") from None
+    if duration > 30.05:
+        raise EditError("Source video exceeds 30 seconds. Choose a shorter video")
     if segments is None:
         segments = [[0, min(duration, 5) if math.isfinite(duration) and duration > 0 else 5]]
+    # The browser cannot set an exact initial range on recordings without metadata.
+    if inferred_duration and segments == [[0, 5]] and 0 < duration < 5:
+        segments = [[0, duration]]
     if duration > 0 and any(end > duration + .05 for _, end in segments):
         raise EditError("A selected segment extends past the end of the video")
     x, y, w, h = crop
