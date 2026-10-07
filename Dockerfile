@@ -20,7 +20,7 @@ RUN pip install --no-cache-dir -r requirements.txt ./bindings/python
 COPY --from=core /src/target/release/libgifmaker_core.so /app/libgifmaker_core.so
 ENV GIFMAKER_CORE_LIBRARY=/app/libgifmaker_core.so
 ENV HYPERFRAMES_BROWSER_PATH=/usr/bin/chromium DO_NOT_TRACK=1 HYPERFRAMES_NO_AUTO_INSTALL=1
-COPY app.py image_motion.py ./
+COPY app.py image_motion.py video_edits.py ./
 COPY motion ./motion
 COPY web ./web
 CMD ["sh", "-c", "uvicorn app:app --host 0.0.0.0 --port ${PORT:-8000}"]

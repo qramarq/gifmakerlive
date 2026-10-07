@@ -11,6 +11,21 @@
 <div id="dropzone" class="preview"><div id="empty"><div class="upload-icon">↥</div><h2>Good moments start here.</h2><p id="drop-label">Drop your video into the studio</p><button id="browse" class="secondary" type="button">Choose a video <span>↗</span></button><small id="upload-hint">MP4, MOV, WebM & more · Up to 100 MiB</small></div><video id="video" controls playsinline hidden></video><img id="still" alt="Your original still image" hidden><img id="gif" alt="Your looping GIF preview" hidden><span id="preview-tag" hidden>LIVE PREVIEW</span></div>
 <input id="file" type="file" accept=".mp4,.mov,.webm,.avi,.mkv,.m4v" hidden>
 <div class="source-footer"><span id="filename">No clip selected</span><button id="record" type="button" hidden>● Start recording</button><button id="replace" type="button" hidden>Replace clip</button></div>
+<fieldset id="video-editor" hidden>
+<legend>Trim, splice &amp; crop</legend>
+<p>Keep one segment or join several, up to 5 seconds total. Scrub the source video to find your cut.</p>
+<div id="segments"></div>
+<div class="edit-actions"><button id="add-segment" type="button">Add segment at playhead</button><button id="reset-edit" type="button">Reset edits</button></div>
+<div class="crop-fields">
+<label>Left (%)<input data-crop type="number" min="0" max="99" step="1" value="0" required></label>
+<label>Top (%)<input data-crop type="number" min="0" max="99" step="1" value="0" required></label>
+<label>Width (%)<input data-crop type="number" min="1" max="100" step="1" value="100" required></label>
+<label>Height (%)<input data-crop type="number" min="1" max="100" step="1" value="100" required></label>
+</div>
+<p>Crop preview</p><canvas aria-label="Preview of the cropped video"></canvas>
+<button id="preview-edit" type="button">Play edited selection</button>
+<p id="edit-summary" role="status" aria-live="polite"></p>
+</fieldset>
 <div id="motion-panel" class="motion-panel" hidden>
 <label for="motion-prompt">What should your picture do?</label>
 <textarea id="motion-prompt" maxlength="240" rows="2" placeholder="Gently float up and down" aria-describedby="motion-help"></textarea>

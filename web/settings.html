@@ -1,6 +1,10 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>GIF output settings</title><style>body{margin:0;background:#191c1c;color:#9fa8a5;font:14px system-ui;overflow:hidden}canvas{position:fixed;inset:0;width:100%;height:100%}#loading{padding:24px}</style></head><body><p id="loading" role="status">Loading your studio controls…</p><script type="module">
+let state;
+window.addEventListener('message', event => {
+  if (event.origin === location.origin && event.source === parent && event.data?.type === 'gif-host-query' && state) parent.postMessage({type: state}, location.origin);
+});
 try { const {default:init,run,sync_settings}=await import('./wasm/gifmaker_studio.js');await init();run();document.querySelector('#loading').remove();
 window.addEventListener('message',event=>{if(event.origin===location.origin && event.source===parent && event.data?.type==='gif-host-settings'){const {fps,width,duration,imageMode}=event.data;sync_settings(fps,width,duration,!!imageMode);}});
-parent.postMessage({type:'gif-settings-ready'},location.origin); }
-catch(error){document.querySelector('#loading').textContent='GPU controls could not load. Use the custom values below.';parent.postMessage({type:'gif-settings-unavailable'},location.origin);console.error(error);}
+state='gif-settings-ready'; parent.postMessage({type:state},location.origin); }
+catch(error){document.querySelector('#loading').textContent='GPU controls could not load. Use the custom values below.';state='gif-settings-unavailable'; parent.postMessage({type:state},location.origin);console.error(error);}
 </script></body></html>

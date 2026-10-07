@@ -1,6 +1,11 @@
+import { createVideoEditor } from "./video-editor.js";
 const $ = id => document.getElementById(id);
 let clip, stream, recorder, sourceUrl, gifUrl, timer, busy = false, recordingBytes = 0;
 let imageMode = false, selectionVersion = 0, pendingMotionJobId;
+const editor = createVideoEditor($('video'), $('video-editor'), () => {
+  clearResult(); $('video').hidden = false; $('convert').textContent = 'Create GIF ↗';
+  status('Edits updated. Preview your selection or create a GIF.');
+});
 const MAX_BYTES = 100 * 1024 * 1024;
 function syncSettings() {
   $('settings').contentWindow.postMessage({type:'gif-host-settings',fps:Number($('fps').value),width:Number($('width').value),duration:Number($('duration').value),imageMode},location.origin);
@@ -11,7 +16,7 @@ $('animate-toggle').onchange = () => {
   if (busy) return;
   imageMode=$('animate-toggle').checked; selectionVersion++;
   pendingMotionJobId=undefined;
-  stopCamera(); clearResult(); clip=undefined;
+  stopCamera(); editor.hide(); clearResult(); clip=undefined;
   if(sourceUrl) URL.revokeObjectURL(sourceUrl); sourceUrl=undefined;
   $('video').removeAttribute('src'); $('still').removeAttribute('src');
   $('video').hidden=$('still').hidden=true; $('empty').hidden=false;
@@ -52,8 +57,8 @@ function selectFile(file) {
   if (sourceUrl) URL.revokeObjectURL(sourceUrl);
   sourceUrl = URL.createObjectURL(file);
   const video = $('video'); video.hidden=imageMode; $('still').hidden=!imageMode;
-  if(imageMode) $('still').src=sourceUrl;
-  else {video.src = sourceUrl; video.muted = false; video.controls = true;}
+  if(imageMode) { editor.hide(); $('still').src=sourceUrl; }
+  else {video.src = sourceUrl; video.muted = false; video.controls = true; editor.show();}
   $('empty').hidden = true; $('preview-tag').hidden = true; $('replace').hidden = false;
   $('filename').textContent = `${file.name} · ${(file.size / 1024 / 1024).toFixed(1)} MiB`;
   $('convert').disabled = false; $('convert').textContent=imageMode?'Animate image ↗':'Create GIF ↗'; $('upload-tab').classList.add('selected'); $('camera-tab').classList.remove('selected');
@@ -73,7 +78,7 @@ $('camera-tab').onclick = async () => {
     const camera=await navigator.mediaDevices.getUserMedia({video: true, audio: false});
     if(version!==selectionVersion || imageMode || busy){camera.getTracks().forEach(track=>track.stop());return;}
     stream = camera;
-    clearResult(); clip = undefined; $('convert').disabled = true;
+    clearResult(); editor.hide(); clip = undefined; $('convert').disabled = true;
     $('video').srcObject = stream; $('video').muted = true; $('video').controls = false; $('video').hidden = false;
     await $('video').play();
     if(version!==selectionVersion || imageMode || busy){camera.getTracks().forEach(track=>track.stop());return;}
@@ -110,19 +115,25 @@ window.addEventListener('message', event => {
     syncSettings();
   }
 });
+// The iframe may finish before this module and its editor dependency load.
+$('settings').contentWindow.postMessage({type:'gif-host-query'}, location.origin);
 $('convert').onclick = async () => {
   if((!clip && !pendingMotionJobId) || busy) return;
   if(!pendingMotionJobId && (!$('fps').reportValidity() || !$('width').reportValidity())) return;
   if(!pendingMotionJobId && imageMode && (!$('motion-prompt').reportValidity() || !$('duration').reportValidity())) return;
+  const edits = imageMode ? null : editor.data();
+  if (!imageMode && !edits) return status('Check the segment times and crop. Keep the selection within 5 seconds.', true);
+  editor.stop();
   selectionVersion++; busy = true; $('convert').disabled = true;
-  const controls=['camera-tab','upload-tab','replace','browse','animate-toggle','motion-prompt','duration','original-size','fps','width'];
+  const controls=['camera-tab','upload-tab','replace','browse','animate-toggle','motion-prompt','duration','original-size','fps','width','video-editor'];
   for(const id of controls) $(id).disabled = true;
   document.querySelectorAll('[data-prompt]').forEach(button=>button.disabled=true);
   $('settings').inert=true;
   clearResult(); $('video').pause(); $('still').hidden=!imageMode; $('video').hidden=imageMode;
-  status(imageMode?'Rendering your original image into a loop…':'Creating your loop… larger clips can take up to two minutes.');
+  status(imageMode?'Rendering your original image into a loop…':'Applying your edits and creating your loop…');
   const data = new FormData();
   if(clip) data.append('file',clip);
+  if(edits) data.append('edits', JSON.stringify(edits));
   data.append('fps',$('fps').value); data.append('width',$('width').value);
   if(imageMode && !pendingMotionJobId){data.append('prompt',$('motion-prompt').value.trim());data.append('duration',$('duration').value);data.append('original_size',$('original-size').checked);}
   try {
@@ -149,7 +160,7 @@ $('convert').onclick = async () => {
         await new Promise(resolve=>setTimeout(resolve,1000));
       }
     } else {
-      const response = await fetch('/convert', {method:'POST',body:data,signal:AbortSignal.timeout(150000)});
+      const response = await fetch('/convert', {method:'POST',body:data,signal:AbortSignal.timeout(270000)});
       result = await response.json().catch(() => ({}));
       if(!response.ok) throw new Error(typeof result.detail === 'string' ? result.detail : 'Conversion failed. Try a shorter video.');
     }

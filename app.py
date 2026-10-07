@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 import gifmaker_core as core
 import image_motion
+import video_edits
 
 BASE_DIR = Path(__file__).resolve().parent
 UPLOAD_DIR = Path(os.environ.get("GIFMAKER_UPLOAD_DIR", BASE_DIR / "uploads"))
@@ -100,7 +101,8 @@ async def motion_status(job: str):
     return JSONResponse({key: value for key, value in state.items() if key != "expires"}, headers={"Cache-Control": "no-store"})
 
 @app.post("/convert")
-async def convert_video(file: UploadFile = File(...), fps: int = Form(10), width: int = Form(320)):
+async def convert_video(file: UploadFile = File(...), fps: int = Form(10), width: int = Form(320),
+                        edits: str = Form("")):
     if not 1 <= fps <= 30 or not 100 <= width <= 800:
         raise HTTPException(422, "Use 1–30 FPS and a width of 100–800 pixels")
     extension = Path(file.filename or "").suffix.lower()
@@ -124,8 +126,12 @@ async def convert_video(file: UploadFile = File(...), fps: int = Form(10), width
             raise HTTPException(503, "The video converter is busy. Please try again shortly")
         async with conversion_slots:
             # ctypes releases the GIL; the worker also keeps the event loop responsive.
-            size = await run_in_threadpool(core.convert, str(source), str(destination), fps, width)
+            size = await run_in_threadpool(video_edits.convert, source, destination, fps, width, edits)
         return {"filename": filename, "file_size": f"{size / 1024:.1f} KB", "fps": fps, "width": width}
+    except video_edits.EditError as error:
+        raise HTTPException(422, str(error)) from error
+    except FileNotFoundError as error:
+        raise HTTPException(503, "The video preparation tools are unavailable") from error
     except core.ConversionError as error:
         status = 422 if isinstance(error, (core.InvalidInput, core.InvalidOptions, core.EncodingFailed)) else 503
         raise HTTPException(status, str(error)) from error
