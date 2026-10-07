@@ -8,12 +8,17 @@
 <div class="motion-switch"><label for="animate-toggle"><input id="animate-toggle" type="checkbox" role="switch"> <span>Animate a still image <b>HyperFrames</b></span></label><p>Give your picture a little motion.</p></div>
 <section id="workspace" class="workspace" aria-label="GIF editor">
 <div class="source-panel"><div class="panel-top"><span class="eyebrow">01 / PICK YOUR MOMENT</span><div class="tabs"><button id="upload-tab" class="selected" type="button">Upload video</button><button id="camera-tab" type="button">Use camera</button></div></div>
-<div id="dropzone" class="preview"><div id="empty"><div class="upload-icon">↥</div><h2>Good moments start here.</h2><p id="drop-label">Drop your video into the studio</p><button id="browse" class="secondary" type="button">Choose a video <span>↗</span></button><small id="upload-hint">MP4, MOV, WebM & more · Up to 100 MiB</small></div><video id="video" controls playsinline hidden></video><img id="still" alt="Your original still image" hidden><img id="gif" alt="Your looping GIF preview" hidden><span id="preview-tag" hidden>LIVE PREVIEW</span></div>
+<div id="dropzone" class="preview"><div id="empty"><div class="upload-icon">↥</div><h2>Good moments start here.</h2><p id="drop-label">Drop your video into the studio</p><button id="browse" class="secondary" type="button">Choose a video <span>↗</span></button><small id="upload-hint">MP4, MOV, WebM & more · Up to 30 seconds / 100 MiB</small></div><video id="video" controls playsinline hidden></video><img id="still" alt="Your original still image" hidden><img id="gif" alt="Your looping GIF preview" hidden><span id="preview-tag" hidden>LIVE PREVIEW</span></div>
 <input id="file" type="file" accept=".mp4,.mov,.webm,.avi,.mkv,.m4v" hidden>
 <div class="source-footer"><span id="filename">No clip selected</span><button id="record" type="button" hidden>● Start recording</button><button id="replace" type="button" hidden>Replace clip</button></div>
 <fieldset id="video-editor" hidden>
 <legend>Trim, splice &amp; crop</legend>
-<p>Keep one segment or join several, up to 5 seconds total. Scrub the source video to find your cut.</p>
+<p>Upload up to 30 seconds. Keep one segment or join several, up to 5 seconds total.</p>
+<div class="guide-toggles" aria-label="Editing guides">
+<label><input id="show-grid" type="checkbox"> Crop grid</label>
+<label><input id="show-tips" type="checkbox" checked aria-controls="editing-tips"> Editing tips</label>
+</div>
+<div id="editing-tips"><p>Scrub the source video to find your moment. Set start and end times, or add a segment at the playhead to join separate moments. Their total must stay within five seconds.</p><p>Crop percentages describe the part you keep. Use the grid to align your subject, then play the edited selection to review your cuts. Guides never appear in your GIF.</p></div>
 <div id="segments"></div>
 <div class="edit-actions"><button id="add-segment" type="button">Add segment at playhead</button><button id="reset-edit" type="button">Reset edits</button></div>
 <div class="crop-fields">

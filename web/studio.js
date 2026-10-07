@@ -26,7 +26,7 @@ $('animate-toggle').onchange = () => {
   $('file').accept=imageMode?'.png,.jpg,.jpeg,.webp':'.mp4,.mov,.webm,.avi,.mkv,.m4v';
   $('drop-label').textContent=imageMode?'Drop a still image into the studio':'Drop your video into the studio';
   $('browse').textContent=imageMode?'Choose an image ↗':'Choose a video ↗';
-  $('upload-hint').textContent=imageMode?'PNG, JPEG, WebP · Up to 20 MiB':'MP4, MOV, WebM & more · Up to 100 MiB';
+  $('upload-hint').textContent=imageMode?'PNG, JPEG, WebP · Up to 20 MiB':'MP4, MOV, WebM & more · Up to 30 seconds / 100 MiB';
   $('replace').hidden=true; $('preview-tag').hidden=true;
   $('replace').textContent=imageMode?'Replace image':'Replace clip';
   $('filename').textContent=imageMode?'No image selected':'No clip selected';
