@@ -8,6 +8,7 @@ const assert = require('node:assert/strict');
   try{
     const page=await browser.newPage({viewport:{width:1360,height:1200}});
     const errors=[]; page.on('pageerror',e=>errors.push(String(e)));
+    const api=[]; page.on('request',request=>{const path=new URL(request.url()).pathname; if(/\/(convert|animate|download)(\/|$)/.test(path)) api.push(path);});
     const fallback=process.env.GIFMAKER_TEST_GPU_FALLBACK==='1';
     if(fallback) await page.route('**/wasm/**',route=>route.abort());
     await page.goto(process.env.GIFMAKER_TEST_URL || 'http://127.0.0.1:8776');
@@ -34,6 +35,8 @@ const assert = require('node:assert/strict');
     assert.equal(await page.locator('#animate-toggle').isDisabled(),true);
     await page.locator('#download').waitFor({state:'visible',timeout:150000});
     assert.match(await page.locator('#status').innerText(),/Loop ready/);
+    await page.waitForFunction(()=>document.querySelector('#gif').naturalWidth>0);
+    assert.deepEqual(await page.locator('#gif').evaluate(img=>({w:img.naturalWidth,h:img.naturalHeight})),{w:324,h:212});
     const bytes=await page.locator('#download').evaluate(async a=>Array.from(new Uint8Array(await(await fetch(a.href)).arrayBuffer())));
     assert.ok(Buffer.from(bytes).includes(Buffer.from('NETSCAPE2.0')));
     assert.equal(await page.locator('#still').isVisible(),false);
@@ -49,7 +52,8 @@ const assert = require('node:assert/strict');
     assert.equal(await page.locator('#camera-tab').isVisible(),true);
     assert.equal(await page.locator('#motion-panel').isVisible(),false);
     assert.equal(await page.locator('#convert').isDisabled(),true);
+    assert.deepEqual(api,[]);
     assert.deepEqual(errors,[]);
-    console.log(`PASS: image toggle, ${fallback?'HTML':'GPUI'} duration, real render/download, unsupported prompt, mobile layout, return to video`);
+    console.log(`PASS: image toggle, ${fallback?'HTML':'GPUI'} duration, in-browser render/download, unsupported prompt, mobile layout, return to video`);
   }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

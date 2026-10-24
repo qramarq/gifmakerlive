@@ -1,4 +1,4 @@
-// Run against the real local backend; uses the same browser as the motion CI check.
+// Static studio, no conversion backend. Uses the same browser as the motion CI check.
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
 const { execFileSync } = require('node:child_process');
@@ -10,13 +10,23 @@ const path = require('node:path');
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'video-browser-'));
   const fixture = path.join(temp, 'source.mp4');
   execFileSync('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', 'testsrc=size=320x200:rate=10', '-t', '30', '-pix_fmt', 'yuv420p', fixture]);
-  const browser = await chromium.launch(process.env.GIFMAKER_TEST_BROWSER
-    ? {executablePath: process.env.GIFMAKER_TEST_BROWSER, headless: true}
-    : {channel: 'msedge', headless: true});
+  const browser = await chromium.launch({
+    executablePath: process.env.GIFMAKER_TEST_BROWSER || undefined,
+    channel: process.env.GIFMAKER_TEST_BROWSER ? undefined : 'msedge',
+    headless: true,
+    args: ['--enable-unsafe-swiftshader', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'],
+  });
+  const context = await browser.newContext({viewport: {width: 1360, height: 1100}, serviceWorkers: 'allow', permissions: ['camera']});
   try {
-    const page = await browser.newPage({viewport: {width: 1360, height: 1100}});
+    const page = await context.newPage();
     const errors = [];
+    const api = [];
     page.on('pageerror', error => errors.push(error.message));
+    page.on('console', msg => { if (msg.type() === 'error') console.log('CONSOLE', msg.text()); });
+    page.on('request', request => {
+      const path = new URL(request.url()).pathname;
+      if (/\/(convert|animate|download)(\/|$)/.test(path)) api.push(path);
+    });
     await page.route('**/wasm/**', route => route.abort());
     await page.goto(process.env.GIFMAKER_TEST_URL || 'http://127.0.0.1:8782');
     await page.waitForFunction(() => document.querySelector('#advanced').open);
@@ -46,12 +56,14 @@ const path = require('node:path');
     await page.waitForFunction(() => document.querySelector('#video').currentTime > .1);
     await page.waitForFunction(() => document.querySelector('#video').currentTime >= 27, null, {timeout: 8000});
     await page.locator('#video').evaluate(video => video.pause());
-    const request = page.waitForRequest(request => request.url().endsWith('/convert'));
     await page.locator('#convert').click();
-    assert.match((await request).postData(), /"segments":\[\[0,2\],\[27,30\]\]/);
-    await page.locator('#download').waitFor({state: 'visible', timeout: 120000});
+    await page.waitForFunction(() => !document.querySelector('#download').hidden || document.querySelector('#status').classList.contains('error'), null, {timeout: 180000});
+    if (await page.locator('#status').evaluate(node => node.classList.contains('error'))) throw new Error(await page.locator('#status').innerText());
+    await page.waitForFunction(() => document.querySelector('#gif').naturalWidth > 0);
     const dimensions = await page.locator('#gif').evaluate(image => ({width: image.naturalWidth, height: image.naturalHeight}));
     assert.deepEqual(dimensions, {width: 320, height: 400});
+    const loop = await page.locator('#download').evaluate(async link => new Uint8Array(await (await fetch(link.href)).arrayBuffer()));
+    assert.ok(Buffer.from(loop).includes(Buffer.from('NETSCAPE2.0')));
     await page.locator('#show-grid').check();
     assert.equal(await page.locator('#download').isVisible(), true);
     await times.nth(1).fill('3');
@@ -71,8 +83,20 @@ const path = require('node:path');
     await page.locator('#file').setInputFiles(fixture);
     await page.waitForFunction(() => document.querySelector('#video').duration === 30);
     assert.equal(await times.count(), 2);
+    await page.locator('#camera-tab').click();
+    await page.locator('#record').waitFor({state: 'visible'});
+    await page.locator('#record').click();
+    await page.waitForTimeout(800);
+    await page.locator('#record').click();
+    await page.waitForFunction(() => !document.querySelector('#convert').disabled, null, {timeout: 10000});
+    await page.locator('#convert').click();
+    await page.waitForFunction(() => !document.querySelector('#download').hidden || document.querySelector('#status').classList.contains('error'), null, {timeout: 180000});
+    if (await page.locator('#status').evaluate(node => node.classList.contains('error'))) throw new Error(await page.locator('#status').innerText());
+    await page.waitForFunction(() => document.querySelector('#gif').naturalWidth > 0);
+    assert.match(await page.locator('#status').innerText(), /Loop ready/);
+    assert.deepEqual(api, []);
     assert.deepEqual(errors, []);
-    console.log('PASS: upload, splice preview, cropped GIF download, invalid edits, reset, mode switch, and mobile layout');
+    console.log('PASS: upload, splice preview, cropped GIF download, invalid edits, reset, mode switch, camera GIF, and mobile layout');
   } finally {
     await browser.close();
     fs.rmSync(temp, {recursive: true, force: true});

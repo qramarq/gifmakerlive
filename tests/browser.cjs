@@ -46,7 +46,7 @@ async function assertContinuousLoop(page) {
     await page.waitForFunction(() => document.getElementById('fps').value === '15', null, {timeout: 10000});
     await page.locator('#file').setInputFiles(process.env.GIFMAKER_TEST_VIDEO);
     await page.locator('#convert').click();
-    await page.locator('#download').waitFor({ state: 'visible', timeout: 30000 });
+    await page.locator('#download').waitFor({ state: 'visible', timeout: 120000 });
     assert.match(await page.locator('#status').innerText(), /Loop ready/);
     await assertContinuousLoop(page);
     await page.locator('#camera-tab').click();
@@ -56,7 +56,7 @@ async function assertContinuousLoop(page) {
     await page.locator('#record').click();
     await page.waitForFunction(() => !document.getElementById('convert').disabled, null, {timeout: 10000});
     await page.locator('#convert').click();
-    await page.locator('#download').waitFor({ state: 'visible', timeout: 30000 });
+    await page.locator('#download').waitFor({ state: 'visible', timeout: 120000 });
     assert.match(await page.locator('#status').innerText(), /Loop ready/);
     await assertContinuousLoop(page);
     await page.setViewportSize({ width: 390, height: 844 });
