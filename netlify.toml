@@ -2,32 +2,25 @@
   command = "bash scripts/netlify_build.sh"
   publish = "dist"
 
-[[redirects]]
-  from = "/animate"
-  to = "https://gifmakerlive.onrender.com/animate"
-  status = 200
-  force = true
+# The studio is static. sw.js must be revalidated so a new deploy can replace the cache.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
 
-[[redirects]]
-  from = "/animate/*"
-  to = "https://gifmakerlive.onrender.com/animate/:splat"
-  status = 200
-  force = true
+[[headers]]
+  for = "/**/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
 
-[[redirects]]
-  from = "/convert"
-  to = "https://gifmakerlive.onrender.com/convert"
-  status = 200
-  force = true
+[[headers]]
+  for = "/*.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json"
+    Cache-Control = "no-cache"
 
-[[redirects]]
-  from = "/download/*"
-  to = "https://gifmakerlive.onrender.com/download/:splat"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/health"
-  to = "https://gifmakerlive.onrender.com/health"
-  status = 200
-  force = true
+[[headers]]
+  for = "/**/*.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json"
+    Cache-Control = "no-cache"

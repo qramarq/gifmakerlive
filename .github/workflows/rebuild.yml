@@ -25,23 +25,26 @@ jobs:
         env:
           GIFMAKER_CORE_LIBRARY: ${{ github.workspace }}/target/debug/libgifmaker_core.so
           DO_NOT_TRACK: '1'
-      - name: Image motion browser flow against the real backend
+      - name: In-browser GIF flows with no backend
         env:
-          GIFMAKER_CORE_LIBRARY: ${{ github.workspace }}/target/debug/libgifmaker_core.so
           GIFMAKER_TEST_GPU_FALLBACK: '1'
-          GIFMAKER_TEST_URL: http://127.0.0.1:8776
+          GIFMAKER_TEST_URL: http://127.0.0.1:8776/technologies/gifmakerlive/
           GIFMAKER_TEST_IMAGE: /tmp/motion-fixture.png
           GIFMAKER_SCREENSHOT: ${{ runner.temp }}/motion-browser.png
           DO_NOT_TRACK: '1'
         run: |
           export GIFMAKER_TEST_BROWSER="$(npx hyperframes browser path)"
           python -c "from PIL import Image, ImageDraw; im=Image.new('RGB',(320,200),(28,48,72)); ImageDraw.Draw(im).rectangle((40,40,120,120),fill=(245,73,81)); im.save('/tmp/motion-fixture.png')"
-          uvicorn app:app --host 127.0.0.1 --port 8776 &
+          rm -rf /tmp/gif-site
+          mkdir -p /tmp/gif-site/technologies/gifmakerlive
+          cp -a web/. /tmp/gif-site/technologies/gifmakerlive/
+          python scripts/serve_static.py --directory /tmp/gif-site --port 8776 &
           server=$!
           trap 'kill "$server"' EXIT
-          python -c "import time, urllib.request; time.sleep(2); urllib.request.urlopen('http://127.0.0.1:8776/health')"
+          python -c "import time, urllib.request; time.sleep(0.5); urllib.request.urlopen('http://127.0.0.1:8776/technologies/gifmakerlive/')"
           node tests/browser-motion.cjs
           node tests/browser-video.cjs
+          node tests/browser-pwa.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

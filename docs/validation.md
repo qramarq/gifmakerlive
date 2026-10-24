@@ -1,5 +1,7 @@
 # Rebuild validation — October 5, 2026
 
+> Historical record of the server-backed rebuild. The browser studio now encodes GIFs on device and does not need the Render service described below.
+
 Implemented in `codex/gpui-weaveffi-rebuild`. No production deployment has been made. The owner-approved review-branch exception is recorded below.
 
 ## Verified locally

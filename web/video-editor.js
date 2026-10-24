@@ -1,6 +1,6 @@
 // Edits stay local until Create GIF; the source file is never modified.
 export function createVideoEditor(video, panel, onEdit) {
-  let segments = [], duration = 0, playing = false, active = 0;
+  let segments = [], duration = 0, playing = false, active = 0, fitted = false;
   const rows = panel.querySelector('#segments');
   const canvas = panel.querySelector('canvas');
   const context = canvas.getContext('2d');
@@ -89,13 +89,28 @@ export function createVideoEditor(video, panel, onEdit) {
     video.requestVideoFrameCallback(frame);
   }
   function reset() {
-    playing = false; video.pause();
+    playing = false; video.pause(); fitted = false;
     duration = Number.isFinite(video.duration) ? video.duration : 0;
     segments = [[0, Math.min(5, duration || 5)]];
     cropInputs.forEach((input, index) => input.value = index < 2 ? 0 : 100);
     render(); draw();
   }
   video.addEventListener('loadedmetadata', () => { if (!video.srcObject) reset(); });
+  // MediaRecorder often reports Infinity, then a real duration. Fit only the untouched default.
+  video.addEventListener('durationchange', () => {
+    const next = Number.isFinite(video.duration) ? video.duration : 0;
+    if (!next || next === duration) return;
+    const fallback = Math.min(5, duration || 5);
+    const wasDefault = !fitted && segments.length === 1 && segments[0][0] === 0 && Math.abs(segments[0][1] - fallback) < 1e-6;
+    duration = next;
+    if (wasDefault) {
+      fitted = true;
+      segments = [[0, Math.min(5, duration)]];
+      render();
+    }
+    valid();
+    draw();
+  });
   return {
     show() { panel.hidden = false; reset(); },
     hide() { panel.hidden = true; playing = false; },
