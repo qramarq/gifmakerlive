@@ -24,10 +24,50 @@ conversion_slots = asyncio.Semaphore(2)
 motion_slots = asyncio.Semaphore(1)
 MAX_BYTES = 100 * 1024 * 1024
 MAX_IMAGE_BYTES = 20 * 1024 * 1024
+OUTPUT_TTL_SECONDS = 600
 motion_jobs = {}
+
+
+def discard_expired_outputs():
+    cutoff = time.time() - OUTPUT_TTL_SECONDS
+    try:
+        entries = list(OUTPUT_DIR.glob("output_*.gif"))
+    except OSError:
+        return
+    for path in entries:
+        try:
+            if path.stat().st_mtime < cutoff:
+                path.unlink()
+        except FileNotFoundError:
+            continue
+
+
+class RejectBusyConvert:
+    """POST /convert returns 503 before the upload is parsed when both slots are taken."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if (
+            scope.get("type") == "http"
+            and scope.get("method") == "POST"
+            and scope.get("path") == "/convert"
+            and conversion_slots.locked()
+        ):
+            await JSONResponse(
+                {"detail": "The video converter is busy. Please try again shortly"},
+                status_code=503,
+            )(scope, receive, send)
+            return
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(RejectBusyConvert)
 
 @app.get("/health")
 async def health():
+    discard_expired_outputs()
     return {"status": "healthy", "service": "gif-maker-live", "engine": "rust-weaveffi",
             "image_motion": {"installed": image_motion.available(), "renderer": "hyperframes", "version": "0.8.134"}}
 
@@ -40,6 +80,7 @@ async def animate_image(background: BackgroundTasks, file: UploadFile = File(...
     filename = f"output_{job}.gif"
     accepted = False
     try:
+        discard_expired_outputs()
         for old_job, state in list(motion_jobs.items()):
             if state.get("expires", float("inf")) < time.monotonic():
                 del motion_jobs[old_job]
@@ -95,6 +136,7 @@ async def render_image_job(job, source, filename, prompt, fps, width, duration, 
 
 @app.get("/animate/{job}")
 async def motion_status(job: str):
+    discard_expired_outputs()
     state = motion_jobs.get(job)
     if not state or state.get("expires", float("inf")) < time.monotonic():
         raise HTTPException(404, "This motion job has expired or the server restarted. Please try again")
@@ -103,6 +145,9 @@ async def motion_status(job: str):
 @app.post("/convert")
 async def convert_video(file: UploadFile = File(...), fps: int = Form(10), width: int = Form(320),
                         edits: str = Form("")):
+    discard_expired_outputs()
+    if conversion_slots.locked():
+        raise HTTPException(503, "The video converter is busy. Please try again shortly")
     if not 1 <= fps <= 30 or not 100 <= width <= 800:
         raise HTTPException(422, "Use 1–30 FPS and a width of 100–800 pixels")
     extension = Path(file.filename or "").suffix.lower()
@@ -140,12 +185,14 @@ async def convert_video(file: UploadFile = File(...), fps: int = Form(10), width
         await file.close()
 
 @app.get("/download/{filename}")
-async def download(filename: str):
+async def download(filename: str, background: BackgroundTasks):
+    discard_expired_outputs()
     if not re.fullmatch(r"output_[a-f0-9]{32}\.gif", filename):
         raise HTTPException(400, "Invalid filename")
     path = OUTPUT_DIR / filename
     if not path.is_file():
         raise HTTPException(404, "GIF not found")
+    background.add_task(path.unlink, missing_ok=True)
     return FileResponse(path, media_type="image/gif", filename=filename)
 
 # A built web directory can be served locally by the same service or by Netlify.
