@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import subprocess
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 from fastapi.testclient import TestClient
@@ -40,6 +41,7 @@ class ConversionTests(unittest.TestCase):
                 self.assertEqual(int.from_bytes(gif.content[8:10], "little"), dimensions[1])
                 # Verify the actual downloaded file repeats forever (loop count zero).
                 self.assertIn(b"\x21\xff\x0bNETSCAPE2.0\x03\x01\x00\x00\x00", gif.content)
+                self.assertFalse((self.root / "output" / result["filename"]).exists())
                 self.assertFalse(list((self.root / "uploads").iterdir()))
 
     def test_bad_input_and_options(self):
@@ -61,10 +63,23 @@ class ConversionTests(unittest.TestCase):
         self.assertEqual(self.client.get("/health").json()["engine"], "rust-weaveffi")
 
     def test_conversion_rejects_saturated_encoder_and_cleans_upload(self):
-        with patch.object(self.app_module, "conversion_slots", asyncio.Semaphore(0)):
+        def body_was_read(*_args, **_kwargs):
+            raise AssertionError("upload body was read")
+
+        with patch.object(self.app_module, "conversion_slots", asyncio.Semaphore(0)), \
+             patch("starlette.requests.Request.body", body_was_read), \
+             patch("starlette.requests.Request.stream", body_was_read):
             response = self.client.post("/convert", files={"file": ("sample.mp4", self.source.read_bytes(), "video/mp4")})
         self.assertEqual(response.status_code, 503, response.text)
         self.assertFalse(list((self.root / "uploads").iterdir()))
+
+    def test_expired_output_is_removed(self):
+        stale = self.app_module.OUTPUT_DIR / ("output_" + "b" * 32 + ".gif")
+        stale.write_bytes(b"GIF89a")
+        old = time.time() - self.app_module.OUTPUT_TTL_SECONDS - 5
+        os.utime(stale, (old, old))
+        self.assertEqual(self.client.get("/download/" + stale.name).status_code, 404)
+        self.assertFalse(stale.exists())
 
 if __name__ == "__main__":
     unittest.main()

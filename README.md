@@ -19,7 +19,7 @@ GPUI provides FPS, output width, and image-loop duration presets; HTML controls 
 
 Images are limited to 20 MiB / 20 million decoded pixels. Rendered frames are bounded to 1800px per side and 120 million pixels across the whole loop. Oversized original-size requests fail with a suggestion to opt into resizing or reduce FPS/duration; the page never silently downsizes them.
 
-The optional FastAPI service still accepts `POST /animate` for callers that want the older HyperFrames/FFmpeg pipeline. The studio does not call it.
+The test-only FastAPI service still accepts `POST /animate` for the older HyperFrames/FFmpeg pipeline. The studio does not call it, and that service is not deployed.
 
 ## Browser encoder
 
@@ -38,7 +38,7 @@ Limits match the previous studio: source video up to 30 seconds and 100 MiB, joi
 - `web/studio.js`, `web/video-gif.js`, `web/motion.js`, `web/gif-encoder.js`: the studio. No runtime calls to `/convert`, `/animate`, or `/download`.
 - `web/sw.js` and `web/manifest.webmanifest`: installable PWA. `start_url` and `scope` are `./`, and the service worker is registered with scope `./`, so a copy served at `/technologies/gifmakerlive/` does not control the rest of the host.
 - `crates/studio`: GPUI (`gpui-pre` 0.3.8) browser controls. Browser-native media elements surround the GPU panel.
-- `crates/gif-core`, `app.py`, `image_motion.py`, `video_edits.py`: optional HTTP API. The studio does not need them. They remain for the existing Python/Rust tests and for callers that still want a server.
+- `crates/gif-core`, `app.py`, `image_motion.py`, `video_edits.py`: test-only HTTP API. The studio does not call it, and it is not deployed. The modules remain so the existing Python tests can run locally.
 
 ## Run the studio locally
 
@@ -82,9 +82,9 @@ Not implemented. The static `dist/` folder is the whole UI, which is what these 
 - **Capacitor**: copy `dist/` into the web asset directory. Add camera usage descriptions (`NSCameraUsageDescription` on iOS, `CAMERA` on Android) and inline playback. Android WebView supports service workers and `getUserMedia`. iOS WKWebView service-worker support is version-dependent; the page still functions when registration fails because registration errors are ignored.
 - **Stores**: a Trusted Web Activity (PWABuilder / Bubblewrap) can list the HTTPS deployment on the Play Store once Digital Asset Links are published. The iOS App Store does not accept a PWA alone; use Capacitor or another native shell. The Microsoft Store can take the PWA directly.
 
-## Optional conversion API
+## Test-only conversion API
 
-The Python service is unchanged for tests and for anyone who still wants FFmpeg on a server. It is not part of the static site.
+`app.py` remains so the Python tests can exercise the older FFmpeg and HyperFrames paths. It is not part of the static site, and nothing in this repository deploys it. Run it only on localhost while running those tests.
 
 Install Rust, Python 3.13+, FFmpeg, and a C linker. Keep FFmpeg on PATH.
 
@@ -99,7 +99,7 @@ export GIFMAKER_CORE_LIBRARY="$PWD/target/debug/libgifmaker_core.so"
 uvicorn app:app --host 127.0.0.1 --port 8000
 ```
 
-The image renderer for that API needs Node 22+ (Docker uses 24), Chromium, FFmpeg and Pillow:
+The image renderer for those tests needs Node 22+ (CI uses 24), Chromium, FFmpeg and Pillow:
 
 ```sh
 npm ci
@@ -107,7 +107,7 @@ npx hyperframes browser ensure
 # Or set HYPERFRAMES_BROWSER_PATH to an installed Chrome Headless Shell executable (recommended on Windows).
 ```
 
-The API uses only the pinned local CLI/GSAP packages and disables update/skill checks, automatic installation, and telemetry for render jobs. Prompts never enter HTML, JavaScript, subprocess command text, or URLs. `/health` reports whether the motion packages and Node are installed. Job status lives in memory for ten minutes and requires a single Uvicorn worker. `docs/validation.md` records the earlier server deploy; do not treat it as the current hosting plan.
+The API uses only the pinned local CLI/GSAP packages and disables update/skill checks, automatic installation, and telemetry for render jobs. Prompts never enter HTML, JavaScript, subprocess command text, or URLs. `/health` reports whether the motion packages and Node are installed. Job status lives in memory for ten minutes and requires a single Uvicorn worker. Output GIFs are removed after download, and files older than ten minutes are removed on the next API request. `docs/validation.md` records an earlier server deploy; that is not the current hosting plan.
 
 ## Verify
 
@@ -133,11 +133,11 @@ GIFMAKER_TEST_URL=http://127.0.0.1:8776/ node tests/browser-pwa.cjs
 
 ## Deployment
 
-Publish `dist/` from `python scripts/build_web.py` (or `scripts/netlify_build.sh`) as static files. The production URL can be a subpath. No proxy to Render is required, and the host does not need `Cross-Origin-Opener-Policy` or `Cross-Origin-Embedder-Policy`.
+Publish `dist/` from `python scripts/build_web.py` (or `scripts/netlify_build.sh`) as static files. The production URL can be a subpath. The host does not need `Cross-Origin-Opener-Policy` or `Cross-Origin-Embedder-Policy`. The Python API is test-only and is not deployed.
 
 Camera capture needs HTTPS (or localhost). No production deployment is performed by the development scripts.
 
-See [design references](docs/design.md) for modern styling options. The original PyQt prototype remains in `live.py` for reference.
+See [design references](docs/design.md) for modern styling options.
 
 ## Video editing
 

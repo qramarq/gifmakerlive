@@ -29,4 +29,4 @@ Optimized packaging and the pinned nightly build still need successful CI before
 
 ## Deployment gate
 
-Deploy the Docker conversion backend and verify `/health` reports `rust-weaveffi` before promoting the Netlify UI. Existing Render services do not change runtime merely because `render.yaml` changes. Container deployment, production routing and HTTPS camera checks remain unverified.
+These notes describe an earlier server-backed studio. `render.yaml`, `Dockerfile`, and `.dockerignore` have been removed. The Python API remains for local tests and is not deployed. Static hosting of `dist/` is the current plan. Container deployment, production routing, and HTTPS camera checks were not verified.
