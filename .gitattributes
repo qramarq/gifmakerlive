@@ -1,4 +1,6 @@
 * text=auto
+*.wasm binary
+dist/** linguist-generated
 *.sh text eol=lf
 *.rs text eol=lf
 *.py text eol=lf

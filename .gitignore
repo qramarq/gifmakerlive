@@ -20,11 +20,11 @@ output/
 .DS_Store
 Thumbs.db
 
-# Build outputs
+# Build outputs. dist/ is the hardened production site and is tracked.
 target/
-dist/
 web/wasm/
 web/fonts/
+.cache/
 *.dll
 *.pdb
 .weaveffi-cache/
@@ -32,3 +32,11 @@ build/
 *.egg-info/
 node_modules/
 .motion-jobs/
+
+# Leftover protection temp files. Do not commit attestation manifests.
+*.bla-manifest.json
+*.hardened.js
+*.hardened.mjs
+*.hardened.cjs
+*.hardened.wasm
+*.hardened.html

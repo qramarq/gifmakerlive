@@ -8,6 +8,8 @@ from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
 RUNTIME_SUFFIXES = {".html", ".css", ".js", ".webmanifest", ".png", ".ttf", ".wasm", ".woff", ".woff2", ".svg", ".ico", ".webp"}
+HARDEN_SUFFIXES = {".js", ".mjs", ".cjs", ".wasm"}
+BLA_PACKAGE = "bla-agents@1.1.0"
 
 
 def precache_urls(dist: Path) -> list[str]:
@@ -48,6 +50,53 @@ def write_precache(dist: Path) -> str:
     return version
 
 
+def node_version() -> tuple[int, int]:
+    try:
+        raw = subprocess.check_output(["node", "-p", "process.versions.node"], text=True).strip()
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise SystemExit("Node.js 22.13+ or 24+ is required to harden the release") from error
+    major, minor, *_rest = (int(part) for part in raw.split("."))
+    if not ((major == 22 and minor >= 13) or major >= 24):
+        raise SystemExit(f"Node.js 22.13+ or 24+ is required to harden the release (found {raw})")
+    return major, minor
+
+
+def ensure_bla() -> Path:
+    node_version()
+    prefix = root / ".cache" / "bla-agents"
+    index = prefix / "node_modules" / "bla-agents" / "dist" / "index.js"
+    if not index.is_file():
+        prefix.mkdir(parents=True, exist_ok=True)
+        subprocess.run(
+            ["npm", "install", "--prefix", str(prefix), "--no-audit", "--no-fund", BLA_PACKAGE],
+            check=True,
+        )
+    if not index.is_file():
+        raise SystemExit("bla-agents did not install")
+    return index
+
+
+def release_artifacts(dist: Path, skip_names: set[str] | None = None) -> list[Path]:
+    skip = skip_names or set()
+    files = []
+    for path in sorted(dist.rglob("*")):
+        if not path.is_file() or path.name in skip or path.suffix.lower() not in HARDEN_SUFFIXES:
+            continue
+        if ".hardened." in path.name:
+            continue
+        files.append(path)
+    return files
+
+
+def harden_paths(paths: list[Path]) -> None:
+    if not paths:
+        return
+    subprocess.run(
+        ["node", str(root / "scripts" / "harden_release.mjs"), str(ensure_bla()), *map(str, paths)],
+        check=True,
+    )
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--debug", action="store_true")
@@ -66,8 +115,12 @@ def main():
         if path.is_file():
             shutil.copy2(path, root / "web/fonts" / path.name)
     dist = root / "dist"
-    shutil.copytree(root / "web", dist, dirs_exist_ok=True)
+    if dist.exists():
+        shutil.rmtree(dist)
+    shutil.copytree(root / "web", dist)
+    harden_paths(release_artifacts(dist, {"sw.js"}))
     version = write_precache(dist)
+    harden_paths([dist / "sw.js"])
     print(f"Wrote {dist / 'sw.js'} ({version})")
 
 
