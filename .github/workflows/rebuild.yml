@@ -59,6 +59,9 @@ jobs:
           toolchain: nightly-2026-10-05
           targets: wasm32-unknown-unknown
       - uses: actions/setup-python@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - run: cargo install wasm-bindgen-cli --version 0.2.121 --locked
       - run: python scripts/build_web.py
       - uses: actions/upload-artifact@v4
