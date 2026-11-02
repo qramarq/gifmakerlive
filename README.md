@@ -60,7 +60,7 @@ python scripts/build_web.py
 python scripts/serve_static.py --directory dist --port 8776
 ```
 
-`scripts/build_web.py` copies `web/` to `dist/` and rewrites `dist/sw.js` with a content-hashed cache name and a relative precache list that includes HTML, JS, CSS, fonts, icons, and the Wasm panel.
+`scripts/build_web.py` copies `web/` to `dist/` and rewrites `dist/sw.js` with a content-hashed cache name and a relative precache list that includes HTML, JS, CSS, fonts, icons, and the Wasm panel. It then hardens the shipped JavaScript and WebAssembly in `dist/` so those release artifacts resist automated reverse-engineering analysis. Runtime behavior stays the same. That step needs Node.js 22.13+ or 24+ and npm.
 
 ## Installable app
 
