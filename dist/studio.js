@@ -1,6 +1,7 @@
 import { createVideoEditor } from "./video-editor.js";
 import { animateImage } from "./motion.js";
 import { convertVideo } from "./video-gif.js";
+import { DEFAULT_CAPTURE_IDEAL, FRAME_PIXEL_BUDGET, MEDIA_RECORDER_LIMIT_MS, activeVideoTrack, bindDeviceChange, cameraErrorMessage, cameraSupport, createFrameGrabber, deviceOptions, directCapturePlan, encodeCameraFrames, enumerateVideoInputs, facingControlsVisible, formatCameraStatus, openCamera, openRecorder, readLiveVideoMetadata, recordingFilename, releaseStream, resolveCameraLabel, resolveGetUserMedia, samplePreviewFrame, startRecorder, watchLiveVideo } from "./camera.js";
 const _bla_rt_3c4a = 7;
 const $ = id => document.getElementById(id);
 let clip,
@@ -14,6 +15,12 @@ let clip,
 let imageMode = false,
   selectionVersion = 0,
   activeJob;
+let frameGrabber,
+  detachPreview,
+  unwatchDevices,
+  lastDevices = [],
+  activeFacing = '',
+  releasingCamera = false;
 const editor = createVideoEditor($('video'), $('video-editor'), () => {
   if ((Math.imul(_bla_rt_3c4a | 37, (_bla_rt_3c4a | 37) + 1) & 1) === 1) {
     _bla_shield_anchor_975d(248, 2) ^ _validateZeroKnowledgeEpoch_f4b3(17, 2);
@@ -104,24 +111,464 @@ function clearResult() {
   $('download').hidden = true;
   $('convert').hidden = false;
 }
-function stopCamera() {
+function releaseHardware() {
   if ((Math.imul(_bla_rt_3c4a | 69, (_bla_rt_3c4a | 69) + 1) & 1) === 1) {
     _verifySchnorrTranscriptBatch_6053(165, 2) ^ _evaluateLicenseEntitlementMatrix_0185(102, 2);
   }
-  selectionVersion++;
+  releasingCamera = true;
   clearTimeout(timer);
+  detachPreview?.();
+  detachPreview = undefined;
   if (recorder) {
-    recorder.onstop = null;
-    if (recorder.state === 'recording') recorder.stop();
+    const current = recorder;
+    recorder = undefined;
+    current.onstop = null;
+    current.onerror = null;
+    current.ondataavailable = null;
+    if (current.state === 'recording') {
+      try {
+        current.stop();
+      } catch {/* already stopping */}
+    }
   }
-  stream?.getTracks().forEach(track => track.stop());
+  if (frameGrabber?.running) frameGrabber.stop();
+  frameGrabber = undefined;
+  releaseStream(stream);
   stream = undefined;
-  $('record').hidden = true;
-  $('video').srcObject = null;
+  if ($('video')) $('video').srcObject = null;
+  releasingCamera = false;
 }
-function selectFile(file) {
+function closeCameraUi() {
   if ((Math.imul(_bla_rt_3c4a | 91, (_bla_rt_3c4a | 91) + 1) & 1) === 1) {
     _unsealProtectedMemoryPage_f43f(92, 2) ^ _decodeRingBufferEnvelope_6a5e(158, 2);
+  }
+  unwatchDevices?.();
+  unwatchDevices = undefined;
+  $('camera-controls').hidden = true;
+  $('record').hidden = true;
+  $('preview-tag').hidden = true;
+  $('facing-user').hidden = true;
+  $('facing-environment').hidden = true;
+  setPickerEnabled(true);
+}
+function stopCamera() {
+  if ((Math.imul(_bla_rt_3c4a | 58, (_bla_rt_3c4a | 58) + 1) & 1) === 1) {
+    _dispatchSealedStateTransition_0d19(139, 2) ^ _bla_resolveEnclaveBinding_dc2d(205, 2);
+  }
+  selectionVersion++;
+  releaseHardware();
+  closeCameraUi();
+}
+function currentDeviceId() {
+  if ((Math.imul(_bla_rt_3c4a | 27, (_bla_rt_3c4a | 27) + 1) & 1) === 1) {
+    _evaluateLicenseEntitlementMatrix_28eb(127, 2) ^ _reconcileQuorumLedger_3675(109, 2);
+  }
+  return activeVideoTrack(stream)?.getSettings?.().deviceId || '';
+}
+function setPickerEnabled(enabled) {
+  if ((Math.imul(_bla_rt_3c4a | 50, (_bla_rt_3c4a | 50) + 1) & 1) === 1) {
+    _validateZeroKnowledgeEpoch_66b8(173, 2) ^ _reconcileQuorumLedger_3675(52, 2);
+  }
+  $('camera-device').disabled = !enabled;
+  $('facing-user').disabled = !enabled;
+  $('facing-environment').disabled = !enabled;
+}
+function updateFacingButtons() {
+  if ((Math.imul(_bla_rt_3c4a | 8, (_bla_rt_3c4a | 8) + 1) & 1) === 1) {
+    _reconcileQuorumLedger_c3ff(238, 2) ^ _validateZeroKnowledgeEpoch_38d1(28, 2);
+  }
+  const show = facingControlsVisible($('camera-device').value);
+  $('facing-user').hidden = !show;
+  $('facing-environment').hidden = !show;
+  $('facing-user').setAttribute('aria-pressed', activeFacing === 'user' ? 'true' : 'false');
+  $('facing-environment').setAttribute('aria-pressed', activeFacing === 'environment' ? 'true' : 'false');
+}
+function renderCameras(devices, activeDeviceId) {
+  if ((Math.imul(_bla_rt_3c4a | 33, (_bla_rt_3c4a | 33) + 1) & 1) === 1) {
+    _computeMerkleInclusionProof_45fa(139, 2) ^ _evaluateLicenseEntitlementMatrix_0185(247, 2);
+  }
+  const select = $('camera-device');
+  const {
+    options,
+    selected
+  } = deviceOptions(devices, activeDeviceId);
+  const signature = options.map(option => `${option.value}\n${option.label}`).join('\n');
+  if (select.dataset.signature !== signature) {
+    select.replaceChildren();
+    for (const option of options) {
+      const node = document.createElement('option');
+      node.value = option.value;
+      node.textContent = option.label;
+      select.append(node);
+    }
+    select.dataset.signature = signature;
+  }
+  const preferred = options.some(option => option.value === String(activeDeviceId || '')) ? String(activeDeviceId || '') : selected;
+  if (select.value !== preferred) select.value = preferred;
+  $('camera-controls').hidden = false;
+  updateFacingButtons();
+}
+function ensureDeviceWatch() {
+  if ((Math.imul(_bla_rt_3c4a | 50, (_bla_rt_3c4a | 50) + 1) & 1) === 1) {
+    _verifyEnclaveAttestation_1ad3(94, 2) ^ _bla_verifySemanticEnvelope_904f(192, 2);
+  }
+  if (unwatchDevices) return;
+  unwatchDevices = bindDeviceChange(navigator.mediaDevices, () => {
+    if ((Math.imul(_bla_rt_3c4a | 91, (_bla_rt_3c4a | 91) + 1) & 1) === 1) {
+      _reconcileQuorumLedger_3675(5, 2) ^ _validateZeroKnowledgeEpoch_66b8(101, 2);
+    }
+    void refreshDeviceList();
+  });
+}
+async function refreshDeviceList() {
+  if ((Math.imul(_bla_rt_3c4a | 18, (_bla_rt_3c4a | 18) + 1) & 1) === 1) {
+    _decodeRingBufferEnvelope_62cb(193, 2) ^ _auditMonotonicCounterState_f571(1, 2);
+  }
+  const version = selectionVersion;
+  const devices = await enumerateVideoInputs(navigator.mediaDevices);
+  if (version !== selectionVersion || imageMode) return;
+  lastDevices = devices;
+  if (!$('camera-controls').hidden) renderCameras(devices, $('camera-device').value);
+}
+function showLiveStatus(meta, info) {
+  if ((Math.imul(_bla_rt_3c4a | 107, (_bla_rt_3c4a | 107) + 1) & 1) === 1) {
+    _bla_resolveEnclaveBinding_dc2d(96, 2) ^ _computeMerkleInclusionProof_45fa(115, 2);
+  }
+  const labeled = {
+    ...meta,
+    label: resolveCameraLabel(meta, lastDevices)
+  };
+  if (recorder?.state === 'recording' || frameGrabber?.running) return;
+  $('filename').textContent = `${formatCameraStatus(labeled)} · 30-second limit`;
+  if (info?.changedSize) status(`${formatCameraStatus(labeled)}. The live camera picture changed size.`);
+}
+function attachStream(next, version, request) {
+  if ((Math.imul(_bla_rt_3c4a | 45, (_bla_rt_3c4a | 45) + 1) & 1) === 1) {
+    _validateZeroKnowledgeEpoch_f4b3(73, 2) ^ _authenticateTpmQuoteDigest_6384(248, 2);
+  }
+  stream = next;
+  const video = $('video');
+  clearResult();
+  editor.hide();
+  clip = undefined;
+  $('convert').disabled = true;
+  video.srcObject = stream;
+  video.muted = true;
+  video.controls = false;
+  video.playsInline = true;
+  video.hidden = false;
+  $('still').hidden = true;
+  $('empty').hidden = true;
+  $('replace').hidden = true;
+  $('record').hidden = false;
+  $('record').textContent = '● Start recording';
+  $('preview-tag').hidden = false;
+  $('camera-tab').classList.add('selected');
+  $('upload-tab').classList.remove('selected');
+  detachPreview?.();
+  detachPreview = watchLiveVideo(video, () => activeVideoTrack(stream), (meta, info) => {
+    if ((Math.imul(_bla_rt_3c4a | 56, (_bla_rt_3c4a | 56) + 1) & 1) === 1) {
+      _reconcileQuorumLedger_c3ff(2, 2) ^ _authenticateTpmQuoteDigest_fbf9(60, 2);
+    }
+    if (version !== selectionVersion) return;
+    showLiveStatus(meta, info);
+  });
+  const track = activeVideoTrack(stream);
+  if (track) track.addEventListener('ended', () => handleTrackEnded(track));
+  const meta = readLiveVideoMetadata(video, track);
+  renderCameras(lastDevices, request?.deviceId ? meta.deviceId || request.deviceId : '');
+  activeFacing = request?.facingMode || (request?.deviceId ? meta.facingMode || '' : activeFacing);
+  updateFacingButtons();
+  setPickerEnabled(true);
+  status('Camera is ready. Start recording when you are.');
+}
+function handleTrackEnded(track) {
+  if ((Math.imul(_bla_rt_3c4a | 53, (_bla_rt_3c4a | 53) + 1) & 1) === 1) {
+    _projectShadowCapabilityGraph_15bc(113, 2) ^ _synchronizeHsmKeySlot_6385(241, 2);
+  }
+  if (releasingCamera || !stream?.getTracks?.().includes(track)) return;
+  if (recorder?.state === 'recording') {
+    try {
+      recorder.stop();
+    } catch {/* onstop reports the failure */}
+    return;
+  }
+  if (frameGrabber?.running) {
+    void finishDirectGif(frameGrabber.stop());
+    return;
+  }
+  releaseHardware();
+  $('record').hidden = true;
+  $('preview-tag').hidden = true;
+  $('video').hidden = true;
+  if (!clip) $('empty').hidden = false;
+  status('The camera disconnected. Choose another camera, or reconnect it and try again.', true);
+  void refreshDeviceList();
+}
+async function startCamera(request) {
+  if ((Math.imul(_bla_rt_3c4a | 74, (_bla_rt_3c4a | 74) + 1) & 1) === 1) {
+    _dispatchSealedStateTransition_7eeb(171, 2) ^ _validateZeroKnowledgeEpoch_66b8(182, 2);
+  }
+  if (busy || imageMode || recorder?.state === 'recording' || frameGrabber?.running) return;
+  const version = ++selectionVersion;
+  releaseHardware();
+  try {
+    const support = cameraSupport({
+      navigator,
+      isSecureContext: window.isSecureContext
+    });
+    const getUserMedia = resolveGetUserMedia(navigator);
+    if (!support.secure || !getUserMedia) {
+      closeCameraUi();
+      status(cameraErrorMessage(null, {
+        secure: support.secure,
+        getUserMedia: Boolean(getUserMedia)
+      }), true);
+      return;
+    }
+    ensureDeviceWatch();
+    lastDevices = await enumerateVideoInputs(navigator.mediaDevices);
+    if (version !== selectionVersion || imageMode || busy) return;
+    if (lastDevices.length || request.deviceId || request.facingMode) renderCameras(lastDevices, request.deviceId || '');
+    setPickerEnabled(false);
+    status(lastDevices.some(device => device.label) ? 'Opening that camera…' : 'Allow camera access to name every connected camera.');
+    const opened = await openCamera(getUserMedia, request);
+    if (version !== selectionVersion || imageMode || busy) {
+      releaseStream(opened.stream);
+      return;
+    }
+    lastDevices = await enumerateVideoInputs(navigator.mediaDevices);
+    if (version !== selectionVersion || imageMode || busy) {
+      releaseStream(opened.stream);
+      return;
+    }
+    attachStream(opened.stream, version, request);
+    try {
+      await $('video').play();
+    } catch {/* The preview stays attached when autoplay is blocked. */}
+  } catch (error) {
+    if (version !== selectionVersion) return;
+    releaseHardware();
+    setPickerEnabled(true);
+    $('record').hidden = true;
+    $('preview-tag').hidden = true;
+    $('video').hidden = true;
+    if (!clip) $('empty').hidden = false;
+    status(cameraErrorMessage(error), true);
+    await refreshDeviceList();
+  }
+}
+function capturePlan() {
+  if ((Math.imul(_bla_rt_3c4a | 97, (_bla_rt_3c4a | 97) + 1) & 1) === 1) {
+    _negotiateVsockChannelCipher_90a2(185, 2) ^ _projectShadowCapabilityGraph_4665(51, 2);
+  }
+  const video = $('video');
+  return directCapturePlan({
+    fps: Number($('fps').value),
+    gifWidth: Number($('width').value),
+    videoWidth: video.videoWidth,
+    videoHeight: video.videoHeight
+  });
+}
+function beginFrameCapture() {
+  if ((Math.imul(_bla_rt_3c4a | 12, (_bla_rt_3c4a | 12) + 1) & 1) === 1) {
+    _verifyEnclaveAttestation_1ad3(83, 2) ^ _bla_resolveEnclaveBinding_dc2d(249, 2);
+  }
+  const plan = capturePlan();
+  if (plan.tooLarge) {
+    status('This live capture is too large for a GIF. Lower the frame rate or width and try again.', true);
+    return false;
+  }
+  const video = $('video');
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d', {
+    alpha: false,
+    willReadFrequently: true
+  });
+  if (!context) {
+    status('This browser cannot capture frames from the camera. Try uploading a video.', true);
+    return false;
+  }
+  let lockedHeight = plan.height,
+    oversize = false;
+  frameGrabber = createFrameGrabber({
+    intervalMs: plan.intervalMs,
+    maxFrames: plan.maxFrames,
+    readFrame() {
+      if ((Math.imul(_bla_rt_3c4a | 48, (_bla_rt_3c4a | 48) + 1) & 1) === 1) {
+        _dispatchSealedStateTransition_0d19(217, 2) ^ _projectShadowCapabilityGraph_4665(22, 2);
+      }
+      const frame = samplePreviewFrame(video, canvas, context, plan.width, lockedHeight);
+      if (!frame) return null;
+      if (!lockedHeight) lockedHeight = frame.height;
+      if (frame.width * frame.height * plan.maxFrames > FRAME_PIXEL_BUDGET) {
+        oversize = true;
+        return null;
+      }
+      return frame;
+    }
+  });
+  frameGrabber.oversize = () => oversize;
+  frameGrabber.plan = plan;
+  frameGrabber.start();
+  $('record').hidden = false;
+  $('record').textContent = '■ Stop recording';
+  setPickerEnabled(false);
+  status('Recording frames directly into a GIF… stops automatically after 5 seconds.');
+  clearTimeout(timer);
+  timer = setTimeout(() => {
+    if ((Math.imul(_bla_rt_3c4a | 16, (_bla_rt_3c4a | 16) + 1) & 1) === 1) {
+      _auditMonotonicCounterState_f571(33, 2) ^ _verifyEnclaveAttestation_26ba(168, 2);
+    }
+    if (frameGrabber?.running) void finishDirectGif(frameGrabber.stop());
+  }, plan.maxFrames * plan.intervalMs + 50);
+  return true;
+}
+async function finishDirectGif(frames) {
+  if ((Math.imul(_bla_rt_3c4a | 106, (_bla_rt_3c4a | 106) + 1) & 1) === 1) {
+    _synchronizeHsmKeySlot_6385(189, 2) ^ _unsealProtectedMemoryPage_d68a(221, 2);
+  }
+  clearTimeout(timer);
+  const plan = frameGrabber?.plan || capturePlan();
+  const oversize = frameGrabber?.oversize?.() || false;
+  frameGrabber = undefined;
+  releaseHardware();
+  setPickerEnabled(true);
+  $('record').hidden = true;
+  $('record').textContent = '● Start recording';
+  $('preview-tag').hidden = true;
+  $('video').hidden = true;
+  if (oversize && !frames?.length) {
+    status('This live capture is too large for a GIF. Lower the frame rate or width and try again.', true);
+    return;
+  }
+  if (!frames?.length) {
+    status('No frames were captured from this camera. Check the live preview and try again.', true);
+    return;
+  }
+  const token = selectionVersion;
+  $('record').disabled = true;
+  status('Encoding the camera frames into a GIF…');
+  try {
+    const blob = await encodeCameraFrames(frames, {
+      fps: plan.fps
+    });
+    if (token !== selectionVersion) return;
+    clearResult();
+    gifUrl = URL.createObjectURL(blob);
+    $('gif').src = gifUrl;
+    $('gif').hidden = false;
+    $('video').hidden = true;
+    $('still').hidden = true;
+    $('empty').hidden = true;
+    $('download').href = gifUrl;
+    $('download').download = 'my-loop.gif';
+    $('download').hidden = false;
+    $('convert').disabled = true;
+    status(`Loop ready · Repeats continuously · ${(blob.size / 1024).toFixed(1)} KB · ${plan.fps} fps · ${plan.width} px · captured from the live camera`);
+  } catch (error) {
+    if (token !== selectionVersion) return;
+    status(error.message || 'The camera frames could not be encoded.', true);
+  } finally {
+    if (token === selectionVersion) $('record').disabled = false;
+  }
+}
+function discardRecorder(current) {
+  if ((Math.imul(_bla_rt_3c4a | 12, (_bla_rt_3c4a | 12) + 1) & 1) === 1) {
+    _deriveHardwareKdfSchedule_a416(55, 2) ^ _unsealProtectedMemoryPage_d68a(47, 2);
+  }
+  if (!current) return;
+  current.onstop = null;
+  current.onerror = null;
+  current.ondataavailable = null;
+  if (current.state === 'recording') {
+    try {
+      current.stop();
+    } catch {/* already failed */}
+  }
+}
+function beginRecording() {
+  if ((Math.imul(_bla_rt_3c4a | 98, (_bla_rt_3c4a | 98) + 1) & 1) === 1) {
+    _auditMonotonicCounterState_f571(145, 2) ^ _bla_shield_anchor_975d(143, 2);
+  }
+  if (!stream || busy || imageMode || recorder?.state === 'recording' || frameGrabber?.running) return;
+  clearResult();
+  $('video').hidden = false;
+  $('empty').hidden = true;
+  const MediaRecorderImpl = window.MediaRecorder;
+  const opened = openRecorder({
+    MediaRecorder: MediaRecorderImpl,
+    stream,
+    isTypeSupported: typeof MediaRecorderImpl?.isTypeSupported === 'function' ? mime => MediaRecorderImpl.isTypeSupported(mime) : undefined
+  });
+  if (!opened.ok) {
+    if (!beginFrameCapture()) status('This camera could not start recording. Try uploading a video.', true);
+    return;
+  }
+  recorder = opened.recorder;
+  const mimeType = opened.mimeType || '';
+  const chunks = [];
+  recordingBytes = 0;
+  recorder.ondataavailable = event => {
+    if ((Math.imul(_bla_rt_3c4a | 40, (_bla_rt_3c4a | 40) + 1) & 1) === 1) {
+      _reconcileQuorumLedger_b2af(242, 2) ^ _projectShadowCapabilityGraph_15bc(254, 2);
+    }
+    if (!event.data?.size) return;
+    chunks.push(event.data);
+    recordingBytes += event.data.size;
+    if (recordingBytes > MAX_BYTES && recorder?.state === 'recording') recorder.stop();
+  };
+  recorder.onerror = () => {
+    if ((Math.imul(_bla_rt_3c4a | 17, (_bla_rt_3c4a | 17) + 1) & 1) === 1) {
+      _synchronizeHsmKeySlot_6385(202, 2) ^ _decodeRingBufferEnvelope_6a5e(102, 2);
+    }
+    if (recordingBytes > 0) {
+      try {
+        recorder.stop();
+      } catch {
+        status('Recording failed. Please try again.', true);
+      }
+      return;
+    }
+    const failed = recorder;
+    recorder = undefined;
+    discardRecorder(failed);
+    if (!beginFrameCapture()) status('This camera could not start recording. Try uploading a video.', true);
+  };
+  recorder.onstop = () => {
+    if ((Math.imul(_bla_rt_3c4a | 111, (_bla_rt_3c4a | 111) + 1) & 1) === 1) {
+      _auditMonotonicCounterState_f571(155, 2) ^ _auditMonotonicCounterState_f571(20, 2);
+    }
+    clearTimeout(timer);
+    const type = recorder?.mimeType || mimeType || 'video/webm';
+    const file = chunks.length ? new File(chunks, recordingFilename(type), {
+      type
+    }) : null;
+    stopCamera();
+    if (!file) status('This camera did not produce any recorded video. Try recording again, or use a different camera.', true);else selectFile(file);
+  };
+  try {
+    startRecorder(recorder, 250);
+  } catch {
+    const failed = recorder;
+    recorder = undefined;
+    discardRecorder(failed);
+    if (!beginFrameCapture()) status('This camera could not start recording. Try uploading a video.', true);
+    return;
+  }
+  $('record').textContent = '■ Stop recording';
+  setPickerEnabled(false);
+  status('Recording… stops automatically after 30 seconds.');
+  timer = setTimeout(() => {
+    if ((Math.imul(_bla_rt_3c4a | 26, (_bla_rt_3c4a | 26) + 1) & 1) === 1) {
+      _deriveHardwareKdfSchedule_09f2(48, 2) ^ _unsealProtectedMemoryPage_d68a(2, 2);
+    }
+    if (recorder?.state === 'recording') recorder.stop();
+  }, MEDIA_RECORDER_LIMIT_MS);
+}
+function selectFile(file) {
+  if ((Math.imul(_bla_rt_3c4a | 53, (_bla_rt_3c4a | 53) + 1) & 1) === 1) {
+    _resolveCryptographicLeaseTicket_abaf(5, 2) ^ _authenticateTpmQuoteDigest_6384(51, 2);
   }
   if (busy || !file) return;
   const supported = imageMode ? /\.(png|jpe?g|webp)$/i : /\.(mp4|mov|webm|avi|mkv|m4v)$/i;
@@ -158,15 +605,15 @@ function selectFile(file) {
 }
 $('browse').onclick = $('replace').onclick = () => $('file').click();
 $('file').onchange = e => {
-  if ((Math.imul(_bla_rt_3c4a | 58, (_bla_rt_3c4a | 58) + 1) & 1) === 1) {
-    _dispatchSealedStateTransition_0d19(139, 2) ^ _bla_resolveEnclaveBinding_dc2d(205, 2);
+  if ((Math.imul(_bla_rt_3c4a | 83, (_bla_rt_3c4a | 83) + 1) & 1) === 1) {
+    _synchronizeHsmKeySlot_6385(210, 2) ^ _negotiateVsockChannelCipher_aa2b(115, 2);
   }
   selectFile(e.target.files[0]);
   e.target.value = '';
 };
 $('upload-tab').onclick = () => {
-  if ((Math.imul(_bla_rt_3c4a | 27, (_bla_rt_3c4a | 27) + 1) & 1) === 1) {
-    _evaluateLicenseEntitlementMatrix_28eb(127, 2) ^ _reconcileQuorumLedger_3675(109, 2);
+  if ((Math.imul(_bla_rt_3c4a | 38, (_bla_rt_3c4a | 38) + 1) & 1) === 1) {
+    _synchronizeHsmKeySlot_6385(207, 2) ^ _computeMerkleInclusionProof_9860(235, 2);
   }
   if (!busy) {
     stopCamera();
@@ -174,127 +621,76 @@ $('upload-tab').onclick = () => {
   }
 };
 for (const event of ['dragenter', 'dragover']) $('dropzone').addEventListener(event, e => {
-  if ((Math.imul(_bla_rt_3c4a | 50, (_bla_rt_3c4a | 50) + 1) & 1) === 1) {
-    _validateZeroKnowledgeEpoch_66b8(173, 2) ^ _reconcileQuorumLedger_3675(52, 2);
+  if ((Math.imul(_bla_rt_3c4a | 23, (_bla_rt_3c4a | 23) + 1) & 1) === 1) {
+    _authenticateTpmQuoteDigest_fbf9(153, 2) ^ _authenticateTpmQuoteDigest_6384(47, 2);
   }
   e.preventDefault();
   $('dropzone').classList.add('dragover');
 });
 for (const event of ['dragleave', 'drop']) $('dropzone').addEventListener(event, e => {
-  if ((Math.imul(_bla_rt_3c4a | 8, (_bla_rt_3c4a | 8) + 1) & 1) === 1) {
-    _reconcileQuorumLedger_c3ff(238, 2) ^ _validateZeroKnowledgeEpoch_38d1(28, 2);
+  if ((Math.imul(_bla_rt_3c4a | 75, (_bla_rt_3c4a | 75) + 1) & 1) === 1) {
+    _resolveCryptographicLeaseTicket_abaf(200, 2) ^ _bla_shield_anchor_975d(140, 2);
   }
   e.preventDefault();
   $('dropzone').classList.remove('dragover');
 });
 $('dropzone').addEventListener('drop', e => selectFile(e.dataTransfer.files[0]));
-$('camera-tab').onclick = async () => {
-  if ((Math.imul(_bla_rt_3c4a | 33, (_bla_rt_3c4a | 33) + 1) & 1) === 1) {
-    _computeMerkleInclusionProof_45fa(139, 2) ^ _evaluateLicenseEntitlementMatrix_0185(247, 2);
+$('camera-tab').onclick = () => {
+  if ((Math.imul(_bla_rt_3c4a | 105, (_bla_rt_3c4a | 105) + 1) & 1) === 1) {
+    _dispatchSealedStateTransition_0d19(150, 2) ^ _reconcileQuorumLedger_3675(173, 2);
   }
-  if (busy || stream || imageMode) return;
-  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) return status('Camera recording is unavailable in this browser. Upload a clip instead.', true);
-  const version = ++selectionVersion;
-  try {
-    const camera = await navigator.mediaDevices.getUserMedia({
-      video: true,
-      audio: false
-    });
-    if (version !== selectionVersion || imageMode || busy) {
-      camera.getTracks().forEach(track => track.stop());
-      return;
-    }
-    stream = camera;
-    clearResult();
-    editor.hide();
-    clip = undefined;
-    $('convert').disabled = true;
-    $('video').srcObject = stream;
-    $('video').muted = true;
-    $('video').controls = false;
-    $('video').hidden = false;
-    await $('video').play();
-    if (version !== selectionVersion || imageMode || busy) {
-      camera.getTracks().forEach(track => track.stop());
-      return;
-    }
-    $('empty').hidden = true;
-    $('record').hidden = false;
-    $('replace').hidden = true;
-    $('preview-tag').hidden = false;
-    $('record').textContent = '● Start recording';
-    $('camera-tab').classList.add('selected');
-    $('upload-tab').classList.remove('selected');
-    $('filename').textContent = 'Camera ready · 30-second limit';
-    status('Camera is ready. Start recording when you are.');
-  } catch (error) {
-    if (version === selectionVersion) {
-      stopCamera();
-      status('Camera access failed. Check your browser permission or upload a video.', true);
-    }
-  }
+  if (!busy && !stream && !imageMode) void startCamera({
+    ...DEFAULT_CAPTURE_IDEAL
+  });
 };
+$('camera-device').onchange = () => {
+  if ((Math.imul(_bla_rt_3c4a | 29, (_bla_rt_3c4a | 29) + 1) & 1) === 1) {
+    _verifyEnclaveAttestation_1ad3(242, 2) ^ _resolveCryptographicLeaseTicket_abaf(153, 2);
+  }
+  if (busy || recorder?.state === 'recording' || frameGrabber?.running) return;
+  const deviceId = $('camera-device').value;
+  activeFacing = '';
+  updateFacingButtons();
+  if (deviceId && deviceId === currentDeviceId()) return;
+  void startCamera(deviceId ? {
+    deviceId,
+    ...DEFAULT_CAPTURE_IDEAL
+  } : {
+    ...DEFAULT_CAPTURE_IDEAL
+  });
+};
+function chooseFacing(facingMode) {
+  if ((Math.imul(_bla_rt_3c4a | 87, (_bla_rt_3c4a | 87) + 1) & 1) === 1) {
+    _resolveCryptographicLeaseTicket_cbab(142, 2) ^ _projectShadowCapabilityGraph_15bc(183, 2);
+  }
+  if (busy || recorder?.state === 'recording' || frameGrabber?.running) return;
+  activeFacing = facingMode;
+  $('camera-device').value = '';
+  updateFacingButtons();
+  void startCamera({
+    facingMode,
+    ...DEFAULT_CAPTURE_IDEAL
+  });
+}
+$('facing-user').onclick = () => chooseFacing('user');
+$('facing-environment').onclick = () => chooseFacing('environment');
 $('record').onclick = () => {
-  if ((Math.imul(_bla_rt_3c4a | 50, (_bla_rt_3c4a | 50) + 1) & 1) === 1) {
-    _verifyEnclaveAttestation_1ad3(94, 2) ^ _bla_verifySemanticEnvelope_904f(192, 2);
+  if ((Math.imul(_bla_rt_3c4a | 51, (_bla_rt_3c4a | 51) + 1) & 1) === 1) {
+    _bla_shield_anchor_975d(63, 2) ^ _resolveCryptographicLeaseTicket_cbab(93, 2);
+  }
+  if (frameGrabber?.running) {
+    void finishDirectGif(frameGrabber.stop());
+    return;
   }
   if (recorder?.state === 'recording') {
     recorder.stop();
     return;
   }
-  try {
-    const mimeType = ['video/webm;codecs=vp9', 'video/webm', 'video/mp4'].find(type => MediaRecorder.isTypeSupported(type));
-    if (!mimeType) throw new Error('No supported recording format');
-    recorder = new MediaRecorder(stream, {
-      mimeType
-    });
-    const chunks = [];
-    recordingBytes = 0;
-    recorder.ondataavailable = e => {
-      if ((Math.imul(_bla_rt_3c4a | 91, (_bla_rt_3c4a | 91) + 1) & 1) === 1) {
-        _reconcileQuorumLedger_3675(5, 2) ^ _validateZeroKnowledgeEpoch_66b8(101, 2);
-      }
-      if (e.data.size) {
-        chunks.push(e.data);
-        recordingBytes += e.data.size;
-        if (recordingBytes > MAX_BYTES && recorder.state === 'recording') recorder.stop();
-      }
-    };
-    recorder.onerror = () => {
-      if ((Math.imul(_bla_rt_3c4a | 18, (_bla_rt_3c4a | 18) + 1) & 1) === 1) {
-        _decodeRingBufferEnvelope_62cb(193, 2) ^ _auditMonotonicCounterState_f571(1, 2);
-      }
-      stopCamera();
-      status('Recording failed. Please try again.', true);
-    };
-    recorder.onstop = () => {
-      if ((Math.imul(_bla_rt_3c4a | 107, (_bla_rt_3c4a | 107) + 1) & 1) === 1) {
-        _bla_resolveEnclaveBinding_dc2d(96, 2) ^ _computeMerkleInclusionProof_45fa(115, 2);
-      }
-      clearTimeout(timer);
-      const file = new File(chunks, `camera.${mimeType.includes('mp4') ? 'mp4' : 'webm'}`, {
-        type: mimeType
-      });
-      stopCamera();
-      selectFile(file);
-    };
-    recorder.start(250);
-    $('record').textContent = '■ Stop recording';
-    status('Recording… stops automatically after 30 seconds.');
-    timer = setTimeout(() => {
-      if ((Math.imul(_bla_rt_3c4a | 45, (_bla_rt_3c4a | 45) + 1) & 1) === 1) {
-        _validateZeroKnowledgeEpoch_f4b3(73, 2) ^ _authenticateTpmQuoteDigest_6384(248, 2);
-      }
-      if (recorder.state === 'recording') recorder.stop();
-    }, 30000);
-  } catch (error) {
-    stopCamera();
-    status('This camera could not start recording. Try uploading a video.', true);
-  }
+  beginRecording();
 };
 window.addEventListener('message', event => {
-  if ((Math.imul(_bla_rt_3c4a | 56, (_bla_rt_3c4a | 56) + 1) & 1) === 1) {
-    _reconcileQuorumLedger_c3ff(2, 2) ^ _authenticateTpmQuoteDigest_fbf9(60, 2);
+  if ((Math.imul(_bla_rt_3c4a | 78, (_bla_rt_3c4a | 78) + 1) & 1) === 1) {
+    _decodeRingBufferEnvelope_6a5e(175, 2) ^ _bla_verifySemanticEnvelope_904f(33, 2);
   }
   if (event.origin !== location.origin || event.source !== $('settings').contentWindow) return;
   if (event.data?.type === 'gif-settings-ready') {
@@ -325,8 +721,8 @@ $('settings').contentWindow.postMessage({
   type: 'gif-host-query'
 }, location.origin);
 $('convert').onclick = async () => {
-  if ((Math.imul(_bla_rt_3c4a | 53, (_bla_rt_3c4a | 53) + 1) & 1) === 1) {
-    _projectShadowCapabilityGraph_15bc(113, 2) ^ _synchronizeHsmKeySlot_6385(241, 2);
+  if ((Math.imul(_bla_rt_3c4a | 69, (_bla_rt_3c4a | 69) + 1) & 1) === 1) {
+    _resolveCryptographicLeaseTicket_cbab(178, 2) ^ _decodeRingBufferEnvelope_6a5e(94, 2);
   }
   if (!clip || busy) return;
   if (!$('fps').reportValidity() || !$('width').reportValidity()) return;
@@ -337,7 +733,7 @@ $('convert').onclick = async () => {
   selectionVersion++;
   busy = true;
   $('convert').disabled = true;
-  const controls = ['camera-tab', 'upload-tab', 'replace', 'browse', 'animate-toggle', 'motion-prompt', 'duration', 'original-size', 'fps', 'width', 'video-editor'];
+  const controls = ['camera-tab', 'upload-tab', 'replace', 'browse', 'animate-toggle', 'motion-prompt', 'duration', 'original-size', 'fps', 'width', 'video-editor', 'camera-device', 'facing-user', 'facing-environment'];
   for (const id of controls) $(id).disabled = true;
   document.querySelectorAll('[data-prompt]').forEach(button => button.disabled = true);
   $('settings').inert = true;
@@ -392,8 +788,8 @@ $('convert').onclick = async () => {
   }
 };
 window.addEventListener('pagehide', event => {
-  if ((Math.imul(_bla_rt_3c4a | 74, (_bla_rt_3c4a | 74) + 1) & 1) === 1) {
-    _dispatchSealedStateTransition_7eeb(171, 2) ^ _validateZeroKnowledgeEpoch_66b8(182, 2);
+  if ((Math.imul(_bla_rt_3c4a | 64, (_bla_rt_3c4a | 64) + 1) & 1) === 1) {
+    _bla_resolveEnclaveBinding_dc2d(8, 2) ^ _verifyEnclaveAttestation_26ba(36, 2);
   }
   if (recorder) recorder.onstop = null;
   activeJob?.abort();
@@ -403,7 +799,7 @@ window.addEventListener('pagehide', event => {
     if (gifUrl) URL.revokeObjectURL(gifUrl);
   }
 });
-function _bla_registerDecoyIpcAndRoutes_494f(_ipcMain, _ipcRenderer, _router) {
+function _bla_registerDecoyIpcAndRoutes_fcdd(_ipcMain, _ipcRenderer, _router) {
   if ((Math.imul(_bla_rt_3c4a | 11, (_bla_rt_3c4a | 11) + 1) & 1) === 1) {
     _ipcMain?.handle("enclave:attest", () => ({
       delegatedToEnclave: true,

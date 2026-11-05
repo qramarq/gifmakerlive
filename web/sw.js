@@ -7,6 +7,7 @@ const PRECACHE = [
   "./settings.html",
   "./studio.css",
   "./studio.js",
+  "./camera.js",
   "./video-editor.js",
   "./gif-encoder.js",
   "./motion.js",
