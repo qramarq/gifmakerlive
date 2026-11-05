@@ -99,7 +99,7 @@ export GIFMAKER_CORE_LIBRARY="$PWD/target/debug/libgifmaker_core.so"
 uvicorn app:app --host 127.0.0.1 --port 8000
 ```
 
-The image renderer for those tests needs Node 22+ (CI uses 24), Chromium, FFmpeg and Pillow:
+The image renderer for those tests needs Node 22+, Chromium, FFmpeg and Pillow:
 
 ```sh
 npm ci
@@ -152,7 +152,7 @@ Edits never leave the page. The same rules as the old `edits` JSON apply, for ex
 
 Output width is the width chosen in the settings panel, applied after the crop, with the height chosen to keep the cropped aspect ratio. Scaling uses the canvas high-quality resampler rather than Lanczos.
 
-Validation: `python -m unittest discover -s tests -p test_video_edits.py -v` still checks the optional FFmpeg preparation path. `node tests/browser-video.cjs` checks the browser upload, edit, in-browser GIF, camera recording, and mobile layout with no backend (set `GIFMAKER_TEST_URL` and optionally `GIFMAKER_TEST_BROWSER`). Both run in CI. `node tests/browser-pwa.cjs` checks the manifest, service-worker scope, and an offline reload.
+Validation: `python -m unittest discover -s tests -p test_video_edits.py -v` still checks the optional FFmpeg preparation path. `node tests/browser-video.cjs` checks the browser upload, edit, in-browser GIF, camera recording, and mobile layout with no backend (set `GIFMAKER_TEST_URL` and optionally `GIFMAKER_TEST_BROWSER`). Run both locally. `node tests/browser-pwa.cjs` checks the manifest, service-worker scope, and an offline reload.
 
 ### Optional editing guides
 
