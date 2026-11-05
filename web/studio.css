@@ -20,7 +20,7 @@ textarea{font:inherit;color:inherit;resize:vertical;background:#101414;border:1p
 .camera-format select,#camera-device{display:block;width:100%;margin-top:5px;background:#101414;color:#fff;border:1px solid var(--line);border-radius:5px;padding:8px;font:inherit}
 #camera-device{width:auto;max-width:46%;margin-top:0;padding:6px}
 select:focus-visible{outline:2px solid var(--lime);outline-offset:4px}
-#camera-readout{font-size:11px;line-height:1.5;color:var(--muted);margin:10px 0 0}
+#camera-readout,#orientation-note{font-size:11px;line-height:1.5;color:var(--muted);margin:10px 0 0}
 .custom{flex-wrap:wrap}
 .custom label{flex:1 1 90px;width:auto}
 @media(max-width:440px){.camera-format .camera-fields{flex-direction:column}}

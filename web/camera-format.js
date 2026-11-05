@@ -315,7 +315,91 @@ export function assertLoopBudget(width, height, frames) {
   }
 }
 
-export function formatReadout({sized, detection, imageMode = false, originalSize = false} = {}) {
+// Hold a portrait or landscape output while the screen orientation is locked.
+// A resolution change that stays in that orientation still updates the size.
+export function orientSource(width, height, lock) {
+  const w = positiveNumber(width);
+  const h = positiveNumber(height);
+  const mode = lock === "portrait" || lock === "landscape" ? lock : "";
+  if (!w || !h || !mode) return {width: w, height: h, locked: false, flipped: false};
+  const flipped = (mode === "portrait" && w > h) || (mode === "landscape" && h > w);
+  return flipped
+    ? {width: h, height: w, locked: true, flipped: true}
+    : {width: w, height: h, locked: true, flipped: false};
+}
+
+// Prefer whichever live reading just changed: track settings after a constraint
+// change, or the video element after a resize / rotation.
+export function chooseLiveSize(previous = {}, reading = {}) {
+  const videoWidth = positiveNumber(reading.videoWidth);
+  const videoHeight = positiveNumber(reading.videoHeight);
+  const settingsWidth = positiveNumber(reading.settingsWidth);
+  const settingsHeight = positiveNumber(reading.settingsHeight);
+  const videoChanged = videoWidth > 0 && (videoWidth !== previous.videoWidth || videoHeight !== previous.videoHeight);
+  const settingsChanged = settingsWidth > 0 && (settingsWidth !== previous.settingsWidth || settingsHeight !== previous.settingsHeight);
+  let width = previous.width || 0;
+  let height = previous.height || 0;
+  let source = previous.source || "";
+  if (settingsChanged) {
+    width = settingsWidth;
+    height = settingsHeight;
+    source = "settings";
+  } else if (videoChanged) {
+    width = videoWidth;
+    height = videoHeight;
+    source = "video";
+  } else if (!width && videoWidth) {
+    width = videoWidth;
+    height = videoHeight;
+    source = "video";
+  } else if (!width && settingsWidth) {
+    width = settingsWidth;
+    height = settingsHeight;
+    source = "settings";
+  }
+  return {width, height, source, videoWidth, videoHeight, settingsWidth, settingsHeight};
+}
+
+export function liveMatchSize({outputWidth, sourceWidth, sourceHeight, lock = ""}) {
+  const oriented = orientSource(sourceWidth, sourceHeight, lock);
+  const sized = outputDimensions({
+    profileId: "match",
+    width: outputWidth,
+    sourceWidth: oriented.width,
+    sourceHeight: oriented.height,
+  });
+  return {...sized, locked: oriented.locked, flipped: oriented.flipped};
+}
+
+const CAMERA_MODES = [
+  [640, 480],
+  [1280, 720],
+  [1920, 1080],
+  [3840, 2160],
+  [4096, 2160],
+  [720, 1280],
+  [1080, 1920],
+];
+
+export function cameraModes(capabilities = {}) {
+  const width = capabilities.width || {};
+  const height = capabilities.height || {};
+  const minW = positiveNumber(width.min) || 1;
+  const maxW = positiveNumber(width.max) || 7680;
+  const minH = positiveNumber(height.min) || 1;
+  const maxH = positiveNumber(height.max) || 7680;
+  return CAMERA_MODES.filter(([w, h]) => w >= minW && w <= maxW && h >= minH && h <= maxH);
+}
+
+export function constraintsForMode(width, height) {
+  return {
+    width: {ideal: width},
+    height: {ideal: height},
+    aspectRatio: {ideal: width / height},
+  };
+}
+
+export function formatReadout({sized, detection, imageMode = false, originalSize = false, orientationLock = ""} = {}) {
   if (imageMode && originalSize) {
     return "Original image size stays on. Turn it off to frame the loop with a camera format.";
   }
@@ -326,7 +410,10 @@ export function formatReadout({sized, detection, imageMode = false, originalSize
   const size = `${sized.width}×${sized.height}`;
   const frame = sized.framing === "fit" ? "fit inside" : "crop to fill";
   const detected = describeCamera(detection);
-  if (sized.profileId === "match") return detected ? `Match camera · ${detected} · ${size}` : `Match camera · ${size}`;
+  if (sized.profileId === "match") {
+    const lock = orientationLock === "portrait" ? "Locked portrait" : orientationLock === "landscape" ? "Locked landscape" : "";
+    return ["Match camera", lock, detected, size].filter(Boolean).join(" · ");
+  }
   const name = PROFILES[sized.profileId]?.label || "Custom frame";
   const lead = detected ? `Detected ${detected}. ` : "";
   const motion = imageMode ? " Motion padding is added around this frame." : "";

@@ -389,6 +389,15 @@ pub fn place_source(
     Ok(Placement { sx, sy, sw, sh, dx: (out_width - dw) / 2.0, dy: (out_height - dh) / 2.0, dw, dh })
 }
 
+/// Keep a locked portrait or landscape frame. A same-orientation resolution change still passes through.
+pub fn orient_source(width: f64, height: f64, lock: &str) -> (f64, f64, bool) {
+    if width <= 0.0 || height <= 0.0 || (lock != "portrait" && lock != "landscape") {
+        return (width, height, false);
+    }
+    let flipped = (lock == "portrait" && width > height) || (lock == "landscape" && height > width);
+    if flipped { (height, width, true) } else { (width, height, true) }
+}
+
 pub fn assert_loop_budget(width: i32, height: i32, frames: i32) -> Result<(), &'static str> {
     if width < 1 || height < 1 || width > 65535 || height > 65535 {
         return Err("GIF dimensions are out of range");
@@ -521,6 +530,38 @@ mod tests {
         near(desqueezed.dw / desqueezed.dh, (2880.0 / 2160.0) * 2.0);
         near(desqueezed.dx, 0.0);
         near(desqueezed.dy, 0.0);
+    }
+
+    #[test]
+    fn live_dimension_changes_update_match_output() {
+        let landscape = output_size("match", "crop", 320, 0, 1920.0, 1080.0, [0.0, 0.0, 100.0, 100.0]).unwrap();
+        assert_eq!(landscape.height, 180);
+        assert_eq!(detect(1920.0, 1080.0, 0.0, "environment", "Back Camera").format_id, "phone-16-9");
+        let portrait = output_size("match", "crop", 320, 0, 1080.0, 1920.0, [0.0, 0.0, 100.0, 100.0]).unwrap();
+        assert_eq!(portrait.height, 569);
+        assert_eq!(detect(1080.0, 1920.0, 0.0, "environment", "Back Camera").format_id, "phone-9-16");
+        let cinema = output_size("match", "crop", 512, 0, 4096.0, 2160.0, [0.0, 0.0, 100.0, 100.0]).unwrap();
+        assert_eq!(cinema.height, 270);
+        assert_eq!(detect(4096.0, 2160.0, 0.0, "", "DeckLink 8K Pro").format_id, "dci-17-9");
+    }
+
+    #[test]
+    fn orientation_lock_holds_across_rotation_and_releases() {
+        let (w, h, locked) = orient_source(1920.0, 1080.0, "portrait");
+        assert!(locked);
+        assert_eq!((w, h), (1080.0, 1920.0));
+        assert_eq!(output_size("match", "crop", 320, 0, w, h, [0.0, 0.0, 100.0, 100.0]).unwrap().height, 569);
+        let (held_w, held_h, _) = orient_source(1080.0, 1920.0, "portrait");
+        assert_eq!((held_w, held_h), (1080.0, 1920.0));
+        let (wide_w, wide_h, _) = orient_source(1080.0, 1920.0, "landscape");
+        assert_eq!((wide_w, wide_h), (1920.0, 1080.0));
+        assert_eq!(output_size("match", "crop", 320, 0, wide_w, wide_h, [0.0, 0.0, 100.0, 100.0]).unwrap().height, 180);
+        let (raw_w, raw_h, unlocked) = orient_source(1080.0, 1920.0, "");
+        assert!(!unlocked);
+        assert_eq!((raw_w, raw_h), (1080.0, 1920.0));
+        let (setting_w, setting_h, _) = orient_source(1440.0, 1080.0, "landscape");
+        assert_eq!((setting_w, setting_h), (1440.0, 1080.0));
+        assert_eq!(output_size("match", "crop", 320, 0, setting_w, setting_h, [0.0, 0.0, 100.0, 100.0]).unwrap().height, 240);
     }
 
     #[test]

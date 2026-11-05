@@ -78,6 +78,21 @@
 </select>
 </label>
 </div>
+<div id="live-camera-tools" hidden>
+<div class="camera-fields">
+<label>Screen orientation
+<select id="orientation-mode">
+<option value="" selected>Follow screen</option>
+<option value="portrait">Lock portrait</option>
+<option value="landscape">Lock landscape</option>
+</select>
+</label>
+<label>Camera resolution
+<select id="camera-resolution" aria-label="Camera resolution"></select>
+</label>
+</div>
+<p id="orientation-note"></p>
+</div>
 <p id="camera-readout" aria-live="polite">Output follows the camera frame. Width stays 100–800 px.</p>
 </div>
 <div id="loop-gif" class="loop-setting"><div><span>Loop GIF</span><span class="loop-enabled"><span aria-hidden="true">↻</span> Enabled</span></div><p>Every GIF repeats continuously, including downloads.</p></div>

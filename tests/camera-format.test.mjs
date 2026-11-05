@@ -5,10 +5,15 @@ import {createGifEncoder} from "../web/gif-encoder.js";
 import {
   PROFILES,
   assertLoopBudget,
+  cameraModes,
+  chooseLiveSize,
+  constraintsForMode,
   describeCamera,
   detectCameraFormat,
   formatReadout,
   heightForAspect,
+  liveMatchSize,
+  orientSource,
   outputDimensions,
   placeSource,
 } from "../web/camera-format.js";
@@ -162,4 +167,57 @@ test("readout and pixel budget stay explicit", () => {
   assert.throws(() => outputDimensions({profileId: "custom", width: 800, height: 2001}), /smaller width/);
   assert.throws(() => outputDimensions({profileId: "match", width: 320, crop: [0, 0, 120, 10]}), /Crop must fit/);
   assert.throws(() => createGifEncoder({width: 4000, height: 4000, samples: [], fps: 10}), /smaller width/);
+});
+
+test("a live feed updates match output when its dimensions change", () => {
+  const phone = liveMatchSize({outputWidth: 320, sourceWidth: 1920, sourceHeight: 1080});
+  assert.equal(phone.height, 180);
+  assert.equal(detectCameraFormat({width: 1920, height: 1080, facingMode: "environment", label: "Back Camera"}).formatId, "phone-16-9");
+  const rotated = liveMatchSize({outputWidth: 320, sourceWidth: 1080, sourceHeight: 1920});
+  assert.equal(rotated.height, 569);
+  assert.equal(detectCameraFormat({width: 1080, height: 1920, facingMode: "environment", label: "Back Camera"}).formatId, "phone-9-16");
+  const cinema = liveMatchSize({outputWidth: 512, sourceWidth: 4096, sourceHeight: 2160});
+  assert.equal(cinema.height, 270);
+  assert.equal(detectCameraFormat({width: 4096, height: 2160, label: "DeckLink 8K Pro"}).formatId, "dci-17-9");
+  const readout = formatReadout({
+    sized: cinema,
+    detection: detectCameraFormat({width: 4096, height: 2160, label: "DeckLink 8K Pro"}),
+  });
+  assert.match(readout, /Match camera · Digital cinema · DCI 17:9 · 512×270/);
+});
+
+test("screen orientation lock holds the output and a camera setting still resizes it", () => {
+  const locked = orientSource(1920, 1080, "portrait");
+  assert.equal(locked.flipped, true);
+  assert.deepEqual([locked.width, locked.height], [1080, 1920]);
+  assert.equal(liveMatchSize({outputWidth: 320, sourceWidth: locked.width, sourceHeight: locked.height, lock: "portrait"}).height, 569);
+  const stillPortrait = orientSource(1080, 1920, "portrait");
+  assert.equal(stillPortrait.flipped, false);
+  assert.equal(liveMatchSize({outputWidth: 320, sourceWidth: stillPortrait.width, sourceHeight: stillPortrait.height, lock: "portrait"}).height, 569);
+  const heldLandscape = orientSource(1080, 1920, "landscape");
+  assert.deepEqual([heldLandscape.width, heldLandscape.height], [1920, 1080]);
+  assert.equal(liveMatchSize({outputWidth: 320, sourceWidth: heldLandscape.width, sourceHeight: heldLandscape.height, lock: "landscape"}).height, 180);
+  const unlocked = orientSource(1080, 1920, "");
+  assert.equal(unlocked.locked, false);
+  assert.equal(liveMatchSize({outputWidth: 320, sourceWidth: unlocked.width, sourceHeight: unlocked.height}).height, 569);
+  const setting = orientSource(1440, 1080, "landscape");
+  assert.equal(setting.flipped, false);
+  assert.equal(liveMatchSize({outputWidth: 320, sourceWidth: setting.width, sourceHeight: setting.height, lock: "landscape"}).height, 240);
+  const sized = liveMatchSize({outputWidth: 320, sourceWidth: 1920, sourceHeight: 1080, lock: "portrait"});
+  assert.match(formatReadout({sized, orientationLock: "portrait", detection: detectCameraFormat({width: 1920, height: 1080, facingMode: "environment", label: "Back Camera"})}), /Locked portrait/);
+});
+
+test("track settings and video resize both move the live size", () => {
+  let reading = chooseLiveSize({}, {videoWidth: 1920, videoHeight: 1080, settingsWidth: 1920, settingsHeight: 1080});
+  assert.equal(reading.source, "settings");
+  reading = chooseLiveSize(reading, {videoWidth: 1920, videoHeight: 1080, settingsWidth: 4096, settingsHeight: 2160});
+  assert.deepEqual([reading.width, reading.height, reading.source], [4096, 2160, "settings"]);
+  reading = chooseLiveSize(reading, {videoWidth: 1080, videoHeight: 1920, settingsWidth: 4096, settingsHeight: 2160});
+  assert.deepEqual([reading.width, reading.height, reading.source], [1080, 1920, "video"]);
+  const modes = cameraModes({width: {min: 640, max: 1920}, height: {min: 480, max: 1080}});
+  assert.deepEqual(modes, [[640, 480], [1280, 720], [1920, 1080]]);
+  const constraints = constraintsForMode(1920, 1080);
+  assert.equal(constraints.width.ideal, 1920);
+  assert.equal(constraints.height.ideal, 1080);
+  assert.ok(Math.abs(constraints.aspectRatio.ideal - 16 / 9) < 1e-9);
 });

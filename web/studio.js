@@ -1,10 +1,11 @@
 import { createVideoEditor } from "./video-editor.js";
 import { animateImage } from "./motion.js";
 import { convertVideo } from "./video-gif.js";
-import { PROFILES, detectCameraFormat, formatReadout, outputDimensions } from "./camera-format.js";
+import { PROFILES, cameraModes, chooseLiveSize, constraintsForMode, detectCameraFormat, formatReadout, orientSource, outputDimensions } from "./camera-format.js";
 const $ = id => document.getElementById(id);
 let clip, stream, recorder, sourceUrl, gifUrl, timer, busy = false, recordingBytes = 0;
 let imageMode = false, selectionVersion = 0, activeJob, detection = null;
+let liveToken = 0, liveKey = '', liveReading = {}, liveOriented = null;
 const editor = createVideoEditor($('video'), $('video-editor'), () => {
   clearResult(); $('video').hidden = false; $('convert').textContent = 'Create GIF ↗';
   status('Edits updated. Preview your selection or create a GIF.');
@@ -26,7 +27,10 @@ function syncSettings(height = 0) {
   }, location.origin);
 }
 function currentSource() {
-  if (!imageMode && $('video').videoWidth) return {width: $('video').videoWidth, height: $('video').videoHeight};
+  if (!imageMode && $('video').videoWidth) {
+    if (stream && $('camera-profile').value === 'match' && liveOriented?.width) return {width: liveOriented.width, height: liveOriented.height};
+    return {width: $('video').videoWidth, height: $('video').videoHeight};
+  }
   if (imageMode && $('still').naturalWidth) return {width: $('still').naturalWidth, height: $('still').naturalHeight};
   return null;
 }
@@ -62,13 +66,15 @@ function refreshOutput() {
   if (sized) {
     $('camera-readout').textContent = formatReadout({
       sized, detection: imageMode ? null : detection, imageMode, originalSize,
+      orientationLock: profileId === 'match' ? $('orientation-mode').value : '',
     });
   }
   const displayHeight = imageMode && originalSize ? 0 : (sized?.height || 0);
   syncSettings(displayHeight);
   editor.refresh();
 }
-for (const id of ['fps', 'width', 'duration', 'camera-profile', 'framing']) $(id).addEventListener('change', refreshOutput);
+for (const id of ['fps', 'width', 'duration', 'framing']) $(id).addEventListener('change', refreshOutput);
+$('camera-profile').addEventListener('change', () => { if (stream) noteLiveFrame(true); else refreshOutput(); });
 $('height').addEventListener('input', () => {
   if ($('camera-profile').value !== 'custom') $('camera-profile').value = 'custom';
   refreshOutput();
@@ -103,12 +109,98 @@ function clearResult() {
   if (gifUrl) URL.revokeObjectURL(gifUrl);
   gifUrl = undefined; $('gif').hidden = true; $('download').hidden = true; $('convert').hidden = false;
 }
+function stopLiveWatch() {
+  liveToken++;
+  liveKey = '';
+  liveReading = {};
+  liveOriented = null;
+  $('video').removeEventListener('resize', onVideoResize);
+}
 function stopCamera() {
   selectionVersion++;
   clearTimeout(timer);
   if (recorder) { recorder.onstop = null; if (recorder.state === 'recording') recorder.stop(); }
+  stopLiveWatch();
   stream?.getTracks().forEach(track => track.stop()); stream = undefined;
-  $('record').hidden = true; $('camera-device').hidden = true; $('video').srcObject = null;
+  $('record').hidden = true; $('camera-device').hidden = true; $('live-camera-tools').hidden = true;
+  $('orientation-mode').value = ''; $('orientation-note').textContent = '';
+  $('video').srcObject = null;
+}
+function noteLiveFrame(force) {
+  if (!stream || imageMode || busy) return;
+  const video = $('video');
+  const track = stream.getVideoTracks?.()[0];
+  const settings = track?.getSettings?.() || {};
+  const next = chooseLiveSize(liveReading, {
+    videoWidth: video.videoWidth || 0,
+    videoHeight: video.videoHeight || 0,
+    settingsWidth: settings.width || 0,
+    settingsHeight: settings.height || 0,
+  });
+  const lock = $('camera-profile').value === 'match' ? $('orientation-mode').value : '';
+  const oriented = orientSource(next.width, next.height, lock);
+  const key = `${next.width}x${next.height}:${oriented.width}x${oriented.height}:${lock}`;
+  liveReading = next;
+  if (!next.width || !next.height) return;
+  if (!force && key === liveKey) return;
+  liveKey = key;
+  detection = detectCameraFormat({
+    width: next.width,
+    height: next.height,
+    aspectRatio: settings.aspectRatio,
+    facingMode: settings.facingMode,
+    label: track?.label || '',
+  });
+  liveOriented = lock ? oriented : {width: next.width, height: next.height, locked: false, flipped: false};
+  refreshOutput();
+}
+function onVideoResize() { noteLiveFrame(true); }
+function startLiveWatch() {
+  stopLiveWatch();
+  const video = $('video');
+  const token = liveToken;
+  const tick = () => {
+    if (token !== liveToken || !stream) return;
+    noteLiveFrame(false);
+    if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(tick);
+    else requestAnimationFrame(tick);
+  };
+  video.addEventListener('resize', onVideoResize);
+  if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(tick);
+  else requestAnimationFrame(tick);
+  noteLiveFrame(true);
+}
+function fillResolutions(track) {
+  const select = $('camera-resolution');
+  const settings = track?.getSettings?.() || {};
+  const modes = cameraModes(track?.getCapabilities?.() || {});
+  select.replaceChildren();
+  const current = document.createElement('option');
+  current.value = '';
+  current.textContent = settings.width && settings.height ? `Current ${settings.width}×${settings.height}` : 'Current resolution';
+  select.append(current);
+  for (const [width, height] of modes) {
+    const option = document.createElement('option');
+    option.value = `${width}x${height}`;
+    option.textContent = `${width}×${height}`;
+    select.append(option);
+  }
+}
+async function setOrientationMode(mode) {
+  const lock = mode === 'portrait' || mode === 'landscape' ? mode : '';
+  $('orientation-mode').value = lock;
+  const api = screen.orientation;
+  if (!lock) {
+    try { await api?.unlock?.(); } catch { /* already unlocked, or unsupported */ }
+    $('orientation-note').textContent = '';
+  } else {
+    let native = false;
+    try {
+      if (api?.lock) { await api.lock(lock); native = true; }
+    } catch { native = false; }
+    $('orientation-note').textContent = native ? '' : 'Output stays in this orientation. This browser does not lock the screen itself.';
+  }
+  noteLiveFrame(true);
 }
 function inspectTrack(mediaStream) {
   const track = mediaStream?.getVideoTracks?.()[0];
@@ -188,14 +280,15 @@ async function openCamera(deviceId) {
     $('video').srcObject = stream; $('video').muted = true; $('video').controls = false; $('video').hidden = false;
     await $('video').play();
     if (version !== selectionVersion || imageMode || busy) { camera.getTracks().forEach(track => track.stop()); return; }
-    detection = inspectTrack(stream);
     $('empty').hidden = true; $('record').hidden = false; $('replace').hidden = true;
     $('preview-tag').hidden = false; $('record').textContent = '● Start recording';
+    $('live-camera-tools').hidden = false;
+    fillResolutions(stream.getVideoTracks()[0]);
     $('camera-tab').classList.add('selected'); $('upload-tab').classList.remove('selected');
     $('filename').textContent = 'Camera ready · 30-second limit';
-    refreshOutput();
+    startLiveWatch();
     const found = detection?.formatId ? $('camera-readout').textContent : 'the live camera';
-    status(`Camera is ready (${found}). Start recording when you are.`);
+    status(`Camera is ready (${found}). Output follows this camera until you lock orientation or pick a preset.`);
     refreshDevices().catch(() => {});
   } catch (error) {
     if (version === selectionVersion) { stopCamera(); status('Camera access failed. Check your browser permission or upload a video.', true); }
@@ -203,11 +296,25 @@ async function openCamera(deviceId) {
 }
 $('camera-tab').onclick = () => { if (!stream) openCamera(); };
 $('camera-device').onchange = () => { if (!busy && stream && recorder?.state !== 'recording') openCamera($('camera-device').value); };
+$('orientation-mode').onchange = () => { if (!busy) setOrientationMode($('orientation-mode').value); };
+$('camera-resolution').onchange = async () => {
+  const value = $('camera-resolution').value;
+  if (!value || !stream || busy) return;
+  if (recorder?.state === 'recording') { $('camera-resolution').value = ''; return; }
+  const [width, height] = value.split('x').map(Number);
+  const track = stream.getVideoTracks()[0];
+  try { await track.applyConstraints(constraintsForMode(width, height)); }
+  catch { status('This camera kept its current resolution.', true); }
+  noteLiveFrame(true);
+  fillResolutions(track);
+};
+screen.orientation?.addEventListener?.('change', () => noteLiveFrame(true));
+window.addEventListener('orientationchange', () => noteLiveFrame(true));
+window.matchMedia?.('(orientation: portrait)')?.addEventListener?.('change', () => noteLiveFrame(true));
 function onVideoReady() {
   if (imageMode) return;
-  if (stream) detection = inspectTrack(stream) || detection;
-  else inspectVideo();
-  refreshOutput();
+  if (stream) noteLiveFrame(true);
+  else { inspectVideo(); refreshOutput(); }
 }
 $('video').addEventListener('loadedmetadata', onVideoReady);
 $('video').addEventListener('loadeddata', onVideoReady);
@@ -258,7 +365,7 @@ $('convert').onclick = async () => {
   if (!imageMode && !edits) return status('Check the segment times and crop. Keep the selection within 5 seconds.', true);
   editor.stop();
   selectionVersion++; busy = true; $('convert').disabled = true;
-  const controls=['camera-tab','upload-tab','replace','browse','animate-toggle','motion-prompt','duration','original-size','fps','width','height','camera-profile','framing','camera-device','video-editor'];
+  const controls=['camera-tab','upload-tab','replace','browse','animate-toggle','motion-prompt','duration','original-size','fps','width','height','camera-profile','framing','camera-device','orientation-mode','camera-resolution','video-editor'];
   for(const id of controls) $(id).disabled = true;
   document.querySelectorAll('[data-prompt]').forEach(button=>button.disabled=true);
   $('settings').inert=true;

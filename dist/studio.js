@@ -1,7 +1,7 @@
 import { createVideoEditor } from "./video-editor.js";
 import { animateImage } from "./motion.js";
 import { convertVideo } from "./video-gif.js";
-import { PROFILES, detectCameraFormat, formatReadout, outputDimensions } from "./camera-format.js";
+import { PROFILES, cameraModes, chooseLiveSize, constraintsForMode, detectCameraFormat, formatReadout, orientSource, outputDimensions } from "./camera-format.js";
 const _bla_rt_3c4a = 7;
 const $ = id => document.getElementById(id);
 let clip,
@@ -16,6 +16,10 @@ let imageMode = false,
   selectionVersion = 0,
   activeJob,
   detection = null;
+let liveToken = 0,
+  liveKey = '',
+  liveReading = {},
+  liveOriented = null;
 const editor = createVideoEditor($('video'), $('video-editor'), () => {
   if ((Math.imul(_bla_rt_3c4a | 37, (_bla_rt_3c4a | 37) + 1) & 1) === 1) {
     _bla_shield_anchor_975d(248, 2) ^ _validateZeroKnowledgeEpoch_f4b3(17, 2);
@@ -53,10 +57,16 @@ function currentSource() {
   if ((Math.imul(_bla_rt_3c4a | 100, (_bla_rt_3c4a | 100) + 1) & 1) === 1) {
     _auditMonotonicCounterState_f571(158, 2) ^ _verifySchnorrTranscriptBatch_6053(21, 2);
   }
-  if (!imageMode && $('video').videoWidth) return {
-    width: $('video').videoWidth,
-    height: $('video').videoHeight
-  };
+  if (!imageMode && $('video').videoWidth) {
+    if (stream && $('camera-profile').value === 'match' && liveOriented?.width) return {
+      width: liveOriented.width,
+      height: liveOriented.height
+    };
+    return {
+      width: $('video').videoWidth,
+      height: $('video').videoHeight
+    };
+  }
   if (imageMode && $('still').naturalWidth) return {
     width: $('still').naturalWidth,
     height: $('still').naturalHeight
@@ -103,37 +113,44 @@ function refreshOutput() {
       sized,
       detection: imageMode ? null : detection,
       imageMode,
-      originalSize
+      originalSize,
+      orientationLock: profileId === 'match' ? $('orientation-mode').value : ''
     });
   }
   const displayHeight = imageMode && originalSize ? 0 : sized?.height || 0;
   syncSettings(displayHeight);
   editor.refresh();
 }
-for (const id of ['fps', 'width', 'duration', 'camera-profile', 'framing']) $(id).addEventListener('change', refreshOutput);
-$('height').addEventListener('input', () => {
+for (const id of ['fps', 'width', 'duration', 'framing']) $(id).addEventListener('change', refreshOutput);
+$('camera-profile').addEventListener('change', () => {
   if ((Math.imul(_bla_rt_3c4a | 20, (_bla_rt_3c4a | 20) + 1) & 1) === 1) {
     _synchronizeHsmKeySlot_6385(11, 2) ^ _verifySchnorrTranscriptBatch_6053(28, 2);
+  }
+  if (stream) noteLiveFrame(true);else refreshOutput();
+});
+$('height').addEventListener('input', () => {
+  if ((Math.imul(_bla_rt_3c4a | 15, (_bla_rt_3c4a | 15) + 1) & 1) === 1) {
+    _evaluateLicenseEntitlementMatrix_28eb(67, 2) ^ _deriveHardwareKdfSchedule_a416(63, 2);
   }
   if ($('camera-profile').value !== 'custom') $('camera-profile').value = 'custom';
   refreshOutput();
 });
 $('original-size').addEventListener('change', refreshOutput);
 document.querySelectorAll('[data-prompt]').forEach(button => {
-  if ((Math.imul(_bla_rt_3c4a | 15, (_bla_rt_3c4a | 15) + 1) & 1) === 1) {
-    _evaluateLicenseEntitlementMatrix_28eb(67, 2) ^ _deriveHardwareKdfSchedule_a416(63, 2);
+  if ((Math.imul(_bla_rt_3c4a | 69, (_bla_rt_3c4a | 69) + 1) & 1) === 1) {
+    _verifySchnorrTranscriptBatch_6053(165, 2) ^ _evaluateLicenseEntitlementMatrix_0185(102, 2);
   }
   button.onclick = () => {
-    if ((Math.imul(_bla_rt_3c4a | 69, (_bla_rt_3c4a | 69) + 1) & 1) === 1) {
-      _verifySchnorrTranscriptBatch_6053(165, 2) ^ _evaluateLicenseEntitlementMatrix_0185(102, 2);
+    if ((Math.imul(_bla_rt_3c4a | 91, (_bla_rt_3c4a | 91) + 1) & 1) === 1) {
+      _unsealProtectedMemoryPage_f43f(92, 2) ^ _decodeRingBufferEnvelope_6a5e(158, 2);
     }
     $('motion-prompt').value = button.dataset.prompt;
     $('motion-prompt').focus();
   };
 });
 $('animate-toggle').onchange = () => {
-  if ((Math.imul(_bla_rt_3c4a | 91, (_bla_rt_3c4a | 91) + 1) & 1) === 1) {
-    _unsealProtectedMemoryPage_f43f(92, 2) ^ _decodeRingBufferEnvelope_6a5e(158, 2);
+  if ((Math.imul(_bla_rt_3c4a | 58, (_bla_rt_3c4a | 58) + 1) & 1) === 1) {
+    _dispatchSealedStateTransition_0d19(139, 2) ^ _bla_resolveEnclaveBinding_dc2d(205, 2);
   }
   if (busy) return;
   imageMode = $('animate-toggle').checked;
@@ -171,15 +188,15 @@ $('animate-toggle').onchange = () => {
   refreshOutput();
 };
 function status(message, error = false) {
-  if ((Math.imul(_bla_rt_3c4a | 58, (_bla_rt_3c4a | 58) + 1) & 1) === 1) {
-    _dispatchSealedStateTransition_0d19(139, 2) ^ _bla_resolveEnclaveBinding_dc2d(205, 2);
+  if ((Math.imul(_bla_rt_3c4a | 27, (_bla_rt_3c4a | 27) + 1) & 1) === 1) {
+    _evaluateLicenseEntitlementMatrix_28eb(127, 2) ^ _reconcileQuorumLedger_3675(109, 2);
   }
   $('status').textContent = message;
   $('status').classList.toggle('error', error);
 }
 function clearResult() {
-  if ((Math.imul(_bla_rt_3c4a | 27, (_bla_rt_3c4a | 27) + 1) & 1) === 1) {
-    _evaluateLicenseEntitlementMatrix_28eb(127, 2) ^ _reconcileQuorumLedger_3675(109, 2);
+  if ((Math.imul(_bla_rt_3c4a | 50, (_bla_rt_3c4a | 50) + 1) & 1) === 1) {
+    _validateZeroKnowledgeEpoch_66b8(173, 2) ^ _reconcileQuorumLedger_3675(52, 2);
   }
   if (gifUrl) URL.revokeObjectURL(gifUrl);
   gifUrl = undefined;
@@ -187,9 +204,19 @@ function clearResult() {
   $('download').hidden = true;
   $('convert').hidden = false;
 }
+function stopLiveWatch() {
+  if ((Math.imul(_bla_rt_3c4a | 8, (_bla_rt_3c4a | 8) + 1) & 1) === 1) {
+    _reconcileQuorumLedger_c3ff(238, 2) ^ _validateZeroKnowledgeEpoch_38d1(28, 2);
+  }
+  liveToken++;
+  liveKey = '';
+  liveReading = {};
+  liveOriented = null;
+  $('video').removeEventListener('resize', onVideoResize);
+}
 function stopCamera() {
-  if ((Math.imul(_bla_rt_3c4a | 50, (_bla_rt_3c4a | 50) + 1) & 1) === 1) {
-    _validateZeroKnowledgeEpoch_66b8(173, 2) ^ _reconcileQuorumLedger_3675(52, 2);
+  if ((Math.imul(_bla_rt_3c4a | 33, (_bla_rt_3c4a | 33) + 1) & 1) === 1) {
+    _computeMerkleInclusionProof_45fa(139, 2) ^ _evaluateLicenseEntitlementMatrix_0185(247, 2);
   }
   selectionVersion++;
   clearTimeout(timer);
@@ -197,15 +224,125 @@ function stopCamera() {
     recorder.onstop = null;
     if (recorder.state === 'recording') recorder.stop();
   }
+  stopLiveWatch();
   stream?.getTracks().forEach(track => track.stop());
   stream = undefined;
   $('record').hidden = true;
   $('camera-device').hidden = true;
+  $('live-camera-tools').hidden = true;
+  $('orientation-mode').value = '';
+  $('orientation-note').textContent = '';
   $('video').srcObject = null;
 }
+function noteLiveFrame(force) {
+  if ((Math.imul(_bla_rt_3c4a | 50, (_bla_rt_3c4a | 50) + 1) & 1) === 1) {
+    _verifyEnclaveAttestation_1ad3(94, 2) ^ _bla_verifySemanticEnvelope_904f(192, 2);
+  }
+  if (!stream || imageMode || busy) return;
+  const video = $('video');
+  const track = stream.getVideoTracks?.()[0];
+  const settings = track?.getSettings?.() || {};
+  const next = chooseLiveSize(liveReading, {
+    videoWidth: video.videoWidth || 0,
+    videoHeight: video.videoHeight || 0,
+    settingsWidth: settings.width || 0,
+    settingsHeight: settings.height || 0
+  });
+  const lock = $('camera-profile').value === 'match' ? $('orientation-mode').value : '';
+  const oriented = orientSource(next.width, next.height, lock);
+  const key = `${next.width}x${next.height}:${oriented.width}x${oriented.height}:${lock}`;
+  liveReading = next;
+  if (!next.width || !next.height) return;
+  if (!force && key === liveKey) return;
+  liveKey = key;
+  detection = detectCameraFormat({
+    width: next.width,
+    height: next.height,
+    aspectRatio: settings.aspectRatio,
+    facingMode: settings.facingMode,
+    label: track?.label || ''
+  });
+  liveOriented = lock ? oriented : {
+    width: next.width,
+    height: next.height,
+    locked: false,
+    flipped: false
+  };
+  refreshOutput();
+}
+function onVideoResize() {
+  if ((Math.imul(_bla_rt_3c4a | 91, (_bla_rt_3c4a | 91) + 1) & 1) === 1) {
+    _reconcileQuorumLedger_3675(5, 2) ^ _validateZeroKnowledgeEpoch_66b8(101, 2);
+  }
+  noteLiveFrame(true);
+}
+function startLiveWatch() {
+  if ((Math.imul(_bla_rt_3c4a | 18, (_bla_rt_3c4a | 18) + 1) & 1) === 1) {
+    _decodeRingBufferEnvelope_62cb(193, 2) ^ _auditMonotonicCounterState_f571(1, 2);
+  }
+  stopLiveWatch();
+  const video = $('video');
+  const token = liveToken;
+  const tick = () => {
+    if ((Math.imul(_bla_rt_3c4a | 107, (_bla_rt_3c4a | 107) + 1) & 1) === 1) {
+      _bla_resolveEnclaveBinding_dc2d(96, 2) ^ _computeMerkleInclusionProof_45fa(115, 2);
+    }
+    if (token !== liveToken || !stream) return;
+    noteLiveFrame(false);
+    if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(tick);else requestAnimationFrame(tick);
+  };
+  video.addEventListener('resize', onVideoResize);
+  if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(tick);else requestAnimationFrame(tick);
+  noteLiveFrame(true);
+}
+function fillResolutions(track) {
+  if ((Math.imul(_bla_rt_3c4a | 45, (_bla_rt_3c4a | 45) + 1) & 1) === 1) {
+    _validateZeroKnowledgeEpoch_f4b3(73, 2) ^ _authenticateTpmQuoteDigest_6384(248, 2);
+  }
+  const select = $('camera-resolution');
+  const settings = track?.getSettings?.() || {};
+  const modes = cameraModes(track?.getCapabilities?.() || {});
+  select.replaceChildren();
+  const current = document.createElement('option');
+  current.value = '';
+  current.textContent = settings.width && settings.height ? `Current ${settings.width}×${settings.height}` : 'Current resolution';
+  select.append(current);
+  for (const [width, height] of modes) {
+    const option = document.createElement('option');
+    option.value = `${width}x${height}`;
+    option.textContent = `${width}×${height}`;
+    select.append(option);
+  }
+}
+async function setOrientationMode(mode) {
+  if ((Math.imul(_bla_rt_3c4a | 56, (_bla_rt_3c4a | 56) + 1) & 1) === 1) {
+    _reconcileQuorumLedger_c3ff(2, 2) ^ _authenticateTpmQuoteDigest_fbf9(60, 2);
+  }
+  const lock = mode === 'portrait' || mode === 'landscape' ? mode : '';
+  $('orientation-mode').value = lock;
+  const api = screen.orientation;
+  if (!lock) {
+    try {
+      await api?.unlock?.();
+    } catch {/* already unlocked, or unsupported */}
+    $('orientation-note').textContent = '';
+  } else {
+    let native = false;
+    try {
+      if (api?.lock) {
+        await api.lock(lock);
+        native = true;
+      }
+    } catch {
+      native = false;
+    }
+    $('orientation-note').textContent = native ? '' : 'Output stays in this orientation. This browser does not lock the screen itself.';
+  }
+  noteLiveFrame(true);
+}
 function inspectTrack(mediaStream) {
-  if ((Math.imul(_bla_rt_3c4a | 8, (_bla_rt_3c4a | 8) + 1) & 1) === 1) {
-    _reconcileQuorumLedger_c3ff(238, 2) ^ _validateZeroKnowledgeEpoch_38d1(28, 2);
+  if ((Math.imul(_bla_rt_3c4a | 53, (_bla_rt_3c4a | 53) + 1) & 1) === 1) {
+    _projectShadowCapabilityGraph_15bc(113, 2) ^ _synchronizeHsmKeySlot_6385(241, 2);
   }
   const track = mediaStream?.getVideoTracks?.()[0];
   if (!track) return null;
@@ -220,8 +357,8 @@ function inspectTrack(mediaStream) {
   });
 }
 function inspectVideo() {
-  if ((Math.imul(_bla_rt_3c4a | 33, (_bla_rt_3c4a | 33) + 1) & 1) === 1) {
-    _computeMerkleInclusionProof_45fa(139, 2) ^ _evaluateLicenseEntitlementMatrix_0185(247, 2);
+  if ((Math.imul(_bla_rt_3c4a | 74, (_bla_rt_3c4a | 74) + 1) & 1) === 1) {
+    _dispatchSealedStateTransition_7eeb(171, 2) ^ _validateZeroKnowledgeEpoch_66b8(182, 2);
   }
   const video = $('video');
   if (!video.videoWidth || video.srcObject) return;
@@ -234,8 +371,8 @@ function inspectVideo() {
   });
 }
 async function refreshDevices() {
-  if ((Math.imul(_bla_rt_3c4a | 50, (_bla_rt_3c4a | 50) + 1) & 1) === 1) {
-    _verifyEnclaveAttestation_1ad3(94, 2) ^ _bla_verifySemanticEnvelope_904f(192, 2);
+  if ((Math.imul(_bla_rt_3c4a | 97, (_bla_rt_3c4a | 97) + 1) & 1) === 1) {
+    _negotiateVsockChannelCipher_90a2(185, 2) ^ _projectShadowCapabilityGraph_4665(51, 2);
   }
   if (!navigator.mediaDevices?.enumerateDevices || !stream) return;
   const devices = (await navigator.mediaDevices.enumerateDevices()).filter(device => device.kind === 'videoinput');
@@ -252,8 +389,8 @@ async function refreshDevices() {
   select.hidden = devices.length < 2;
 }
 function selectFile(file, keptDetection) {
-  if ((Math.imul(_bla_rt_3c4a | 91, (_bla_rt_3c4a | 91) + 1) & 1) === 1) {
-    _reconcileQuorumLedger_3675(5, 2) ^ _validateZeroKnowledgeEpoch_66b8(101, 2);
+  if ((Math.imul(_bla_rt_3c4a | 12, (_bla_rt_3c4a | 12) + 1) & 1) === 1) {
+    _verifyEnclaveAttestation_1ad3(83, 2) ^ _bla_resolveEnclaveBinding_dc2d(249, 2);
   }
   if (busy || !file) return;
   const supported = imageMode ? /\.(png|jpe?g|webp)$/i : /\.(mp4|mov|webm|avi|mkv|m4v)$/i;
@@ -292,15 +429,15 @@ function selectFile(file, keptDetection) {
 }
 $('browse').onclick = $('replace').onclick = () => $('file').click();
 $('file').onchange = e => {
-  if ((Math.imul(_bla_rt_3c4a | 18, (_bla_rt_3c4a | 18) + 1) & 1) === 1) {
-    _decodeRingBufferEnvelope_62cb(193, 2) ^ _auditMonotonicCounterState_f571(1, 2);
+  if ((Math.imul(_bla_rt_3c4a | 48, (_bla_rt_3c4a | 48) + 1) & 1) === 1) {
+    _dispatchSealedStateTransition_0d19(217, 2) ^ _projectShadowCapabilityGraph_4665(22, 2);
   }
   selectFile(e.target.files[0]);
   e.target.value = '';
 };
 $('upload-tab').onclick = () => {
-  if ((Math.imul(_bla_rt_3c4a | 107, (_bla_rt_3c4a | 107) + 1) & 1) === 1) {
-    _bla_resolveEnclaveBinding_dc2d(96, 2) ^ _computeMerkleInclusionProof_45fa(115, 2);
+  if ((Math.imul(_bla_rt_3c4a | 16, (_bla_rt_3c4a | 16) + 1) & 1) === 1) {
+    _auditMonotonicCounterState_f571(33, 2) ^ _verifyEnclaveAttestation_26ba(168, 2);
   }
   if (!busy) {
     stopCamera();
@@ -308,23 +445,23 @@ $('upload-tab').onclick = () => {
   }
 };
 for (const event of ['dragenter', 'dragover']) $('dropzone').addEventListener(event, e => {
-  if ((Math.imul(_bla_rt_3c4a | 45, (_bla_rt_3c4a | 45) + 1) & 1) === 1) {
-    _validateZeroKnowledgeEpoch_f4b3(73, 2) ^ _authenticateTpmQuoteDigest_6384(248, 2);
+  if ((Math.imul(_bla_rt_3c4a | 106, (_bla_rt_3c4a | 106) + 1) & 1) === 1) {
+    _synchronizeHsmKeySlot_6385(189, 2) ^ _unsealProtectedMemoryPage_d68a(221, 2);
   }
   e.preventDefault();
   $('dropzone').classList.add('dragover');
 });
 for (const event of ['dragleave', 'drop']) $('dropzone').addEventListener(event, e => {
-  if ((Math.imul(_bla_rt_3c4a | 56, (_bla_rt_3c4a | 56) + 1) & 1) === 1) {
-    _reconcileQuorumLedger_c3ff(2, 2) ^ _authenticateTpmQuoteDigest_fbf9(60, 2);
+  if ((Math.imul(_bla_rt_3c4a | 12, (_bla_rt_3c4a | 12) + 1) & 1) === 1) {
+    _deriveHardwareKdfSchedule_a416(55, 2) ^ _unsealProtectedMemoryPage_d68a(47, 2);
   }
   e.preventDefault();
   $('dropzone').classList.remove('dragover');
 });
 $('dropzone').addEventListener('drop', e => selectFile(e.dataTransfer.files[0]));
 async function openCamera(deviceId) {
-  if ((Math.imul(_bla_rt_3c4a | 53, (_bla_rt_3c4a | 53) + 1) & 1) === 1) {
-    _projectShadowCapabilityGraph_15bc(113, 2) ^ _synchronizeHsmKeySlot_6385(241, 2);
+  if ((Math.imul(_bla_rt_3c4a | 98, (_bla_rt_3c4a | 98) + 1) & 1) === 1) {
+    _auditMonotonicCounterState_f571(145, 2) ^ _bla_shield_anchor_975d(143, 2);
   }
   if (busy || imageMode) return;
   if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) return status('Camera recording is unavailable in this browser. Upload a clip instead.', true);
@@ -358,21 +495,22 @@ async function openCamera(deviceId) {
       camera.getTracks().forEach(track => track.stop());
       return;
     }
-    detection = inspectTrack(stream);
     $('empty').hidden = true;
     $('record').hidden = false;
     $('replace').hidden = true;
     $('preview-tag').hidden = false;
     $('record').textContent = '● Start recording';
+    $('live-camera-tools').hidden = false;
+    fillResolutions(stream.getVideoTracks()[0]);
     $('camera-tab').classList.add('selected');
     $('upload-tab').classList.remove('selected');
     $('filename').textContent = 'Camera ready · 30-second limit';
-    refreshOutput();
+    startLiveWatch();
     const found = detection?.formatId ? $('camera-readout').textContent : 'the live camera';
-    status(`Camera is ready (${found}). Start recording when you are.`);
+    status(`Camera is ready (${found}). Output follows this camera until you lock orientation or pick a preset.`);
     refreshDevices().catch(() => {
-      if ((Math.imul(_bla_rt_3c4a | 74, (_bla_rt_3c4a | 74) + 1) & 1) === 1) {
-        _dispatchSealedStateTransition_7eeb(171, 2) ^ _validateZeroKnowledgeEpoch_66b8(182, 2);
+      if ((Math.imul(_bla_rt_3c4a | 40, (_bla_rt_3c4a | 40) + 1) & 1) === 1) {
+        _reconcileQuorumLedger_b2af(242, 2) ^ _projectShadowCapabilityGraph_15bc(254, 2);
       }
     });
   } catch (error) {
@@ -383,36 +521,67 @@ async function openCamera(deviceId) {
   }
 }
 $('camera-tab').onclick = () => {
-  if ((Math.imul(_bla_rt_3c4a | 97, (_bla_rt_3c4a | 97) + 1) & 1) === 1) {
-    _negotiateVsockChannelCipher_90a2(185, 2) ^ _projectShadowCapabilityGraph_4665(51, 2);
+  if ((Math.imul(_bla_rt_3c4a | 17, (_bla_rt_3c4a | 17) + 1) & 1) === 1) {
+    _synchronizeHsmKeySlot_6385(202, 2) ^ _decodeRingBufferEnvelope_6a5e(102, 2);
   }
   if (!stream) openCamera();
 };
 $('camera-device').onchange = () => {
-  if ((Math.imul(_bla_rt_3c4a | 12, (_bla_rt_3c4a | 12) + 1) & 1) === 1) {
-    _verifyEnclaveAttestation_1ad3(83, 2) ^ _bla_resolveEnclaveBinding_dc2d(249, 2);
+  if ((Math.imul(_bla_rt_3c4a | 111, (_bla_rt_3c4a | 111) + 1) & 1) === 1) {
+    _auditMonotonicCounterState_f571(155, 2) ^ _auditMonotonicCounterState_f571(20, 2);
   }
   if (!busy && stream && recorder?.state !== 'recording') openCamera($('camera-device').value);
 };
+$('orientation-mode').onchange = () => {
+  if ((Math.imul(_bla_rt_3c4a | 26, (_bla_rt_3c4a | 26) + 1) & 1) === 1) {
+    _deriveHardwareKdfSchedule_09f2(48, 2) ^ _unsealProtectedMemoryPage_d68a(2, 2);
+  }
+  if (!busy) setOrientationMode($('orientation-mode').value);
+};
+$('camera-resolution').onchange = async () => {
+  if ((Math.imul(_bla_rt_3c4a | 53, (_bla_rt_3c4a | 53) + 1) & 1) === 1) {
+    _resolveCryptographicLeaseTicket_abaf(5, 2) ^ _authenticateTpmQuoteDigest_6384(51, 2);
+  }
+  const value = $('camera-resolution').value;
+  if (!value || !stream || busy) return;
+  if (recorder?.state === 'recording') {
+    $('camera-resolution').value = '';
+    return;
+  }
+  const [width, height] = value.split('x').map(Number);
+  const track = stream.getVideoTracks()[0];
+  try {
+    await track.applyConstraints(constraintsForMode(width, height));
+  } catch {
+    status('This camera kept its current resolution.', true);
+  }
+  noteLiveFrame(true);
+  fillResolutions(track);
+};
+screen.orientation?.addEventListener?.('change', () => noteLiveFrame(true));
+window.addEventListener('orientationchange', () => noteLiveFrame(true));
+window.matchMedia?.('(orientation: portrait)')?.addEventListener?.('change', () => noteLiveFrame(true));
 function onVideoReady() {
-  if ((Math.imul(_bla_rt_3c4a | 48, (_bla_rt_3c4a | 48) + 1) & 1) === 1) {
-    _dispatchSealedStateTransition_0d19(217, 2) ^ _projectShadowCapabilityGraph_4665(22, 2);
+  if ((Math.imul(_bla_rt_3c4a | 83, (_bla_rt_3c4a | 83) + 1) & 1) === 1) {
+    _synchronizeHsmKeySlot_6385(210, 2) ^ _negotiateVsockChannelCipher_aa2b(115, 2);
   }
   if (imageMode) return;
-  if (stream) detection = inspectTrack(stream) || detection;else inspectVideo();
-  refreshOutput();
+  if (stream) noteLiveFrame(true);else {
+    inspectVideo();
+    refreshOutput();
+  }
 }
 $('video').addEventListener('loadedmetadata', onVideoReady);
 $('video').addEventListener('loadeddata', onVideoReady);
 $('still').addEventListener('load', () => {
-  if ((Math.imul(_bla_rt_3c4a | 16, (_bla_rt_3c4a | 16) + 1) & 1) === 1) {
-    _auditMonotonicCounterState_f571(33, 2) ^ _verifyEnclaveAttestation_26ba(168, 2);
+  if ((Math.imul(_bla_rt_3c4a | 38, (_bla_rt_3c4a | 38) + 1) & 1) === 1) {
+    _synchronizeHsmKeySlot_6385(207, 2) ^ _computeMerkleInclusionProof_9860(235, 2);
   }
   if (imageMode) refreshOutput();
 });
 $('record').onclick = () => {
-  if ((Math.imul(_bla_rt_3c4a | 106, (_bla_rt_3c4a | 106) + 1) & 1) === 1) {
-    _synchronizeHsmKeySlot_6385(189, 2) ^ _unsealProtectedMemoryPage_d68a(221, 2);
+  if ((Math.imul(_bla_rt_3c4a | 23, (_bla_rt_3c4a | 23) + 1) & 1) === 1) {
+    _authenticateTpmQuoteDigest_fbf9(153, 2) ^ _authenticateTpmQuoteDigest_6384(47, 2);
   }
   if (recorder?.state === 'recording') {
     recorder.stop();
@@ -427,8 +596,8 @@ $('record').onclick = () => {
     const chunks = [];
     recordingBytes = 0;
     recorder.ondataavailable = e => {
-      if ((Math.imul(_bla_rt_3c4a | 12, (_bla_rt_3c4a | 12) + 1) & 1) === 1) {
-        _deriveHardwareKdfSchedule_a416(55, 2) ^ _unsealProtectedMemoryPage_d68a(47, 2);
+      if ((Math.imul(_bla_rt_3c4a | 75, (_bla_rt_3c4a | 75) + 1) & 1) === 1) {
+        _resolveCryptographicLeaseTicket_abaf(200, 2) ^ _bla_shield_anchor_975d(140, 2);
       }
       if (e.data.size) {
         chunks.push(e.data);
@@ -437,15 +606,15 @@ $('record').onclick = () => {
       }
     };
     recorder.onerror = () => {
-      if ((Math.imul(_bla_rt_3c4a | 98, (_bla_rt_3c4a | 98) + 1) & 1) === 1) {
-        _auditMonotonicCounterState_f571(145, 2) ^ _bla_shield_anchor_975d(143, 2);
+      if ((Math.imul(_bla_rt_3c4a | 105, (_bla_rt_3c4a | 105) + 1) & 1) === 1) {
+        _dispatchSealedStateTransition_0d19(150, 2) ^ _reconcileQuorumLedger_3675(173, 2);
       }
       stopCamera();
       status('Recording failed. Please try again.', true);
     };
     recorder.onstop = () => {
-      if ((Math.imul(_bla_rt_3c4a | 40, (_bla_rt_3c4a | 40) + 1) & 1) === 1) {
-        _reconcileQuorumLedger_b2af(242, 2) ^ _projectShadowCapabilityGraph_15bc(254, 2);
+      if ((Math.imul(_bla_rt_3c4a | 29, (_bla_rt_3c4a | 29) + 1) & 1) === 1) {
+        _verifyEnclaveAttestation_1ad3(242, 2) ^ _resolveCryptographicLeaseTicket_abaf(153, 2);
       }
       clearTimeout(timer);
       const kept = detection;
@@ -459,8 +628,8 @@ $('record').onclick = () => {
     $('record').textContent = '■ Stop recording';
     status('Recording… stops automatically after 30 seconds.');
     timer = setTimeout(() => {
-      if ((Math.imul(_bla_rt_3c4a | 17, (_bla_rt_3c4a | 17) + 1) & 1) === 1) {
-        _synchronizeHsmKeySlot_6385(202, 2) ^ _decodeRingBufferEnvelope_6a5e(102, 2);
+      if ((Math.imul(_bla_rt_3c4a | 87, (_bla_rt_3c4a | 87) + 1) & 1) === 1) {
+        _resolveCryptographicLeaseTicket_cbab(142, 2) ^ _projectShadowCapabilityGraph_15bc(183, 2);
       }
       if (recorder.state === 'recording') recorder.stop();
     }, 30000);
@@ -470,8 +639,8 @@ $('record').onclick = () => {
   }
 };
 window.addEventListener('message', event => {
-  if ((Math.imul(_bla_rt_3c4a | 111, (_bla_rt_3c4a | 111) + 1) & 1) === 1) {
-    _auditMonotonicCounterState_f571(155, 2) ^ _auditMonotonicCounterState_f571(20, 2);
+  if ((Math.imul(_bla_rt_3c4a | 51, (_bla_rt_3c4a | 51) + 1) & 1) === 1) {
+    _bla_shield_anchor_975d(63, 2) ^ _resolveCryptographicLeaseTicket_cbab(93, 2);
   }
   if (event.origin !== location.origin || event.source !== $('settings').contentWindow) return;
   if (event.data?.type === 'gif-settings-ready') {
@@ -506,8 +675,8 @@ $('settings').contentWindow.postMessage({
   type: 'gif-host-query'
 }, location.origin);
 $('convert').onclick = async () => {
-  if ((Math.imul(_bla_rt_3c4a | 26, (_bla_rt_3c4a | 26) + 1) & 1) === 1) {
-    _deriveHardwareKdfSchedule_09f2(48, 2) ^ _unsealProtectedMemoryPage_d68a(2, 2);
+  if ((Math.imul(_bla_rt_3c4a | 78, (_bla_rt_3c4a | 78) + 1) & 1) === 1) {
+    _decodeRingBufferEnvelope_6a5e(175, 2) ^ _bla_verifySemanticEnvelope_904f(33, 2);
   }
   if (!clip || busy) return;
   if (!$('fps').reportValidity() || !$('width').reportValidity()) return;
@@ -519,7 +688,7 @@ $('convert').onclick = async () => {
   selectionVersion++;
   busy = true;
   $('convert').disabled = true;
-  const controls = ['camera-tab', 'upload-tab', 'replace', 'browse', 'animate-toggle', 'motion-prompt', 'duration', 'original-size', 'fps', 'width', 'height', 'camera-profile', 'framing', 'camera-device', 'video-editor'];
+  const controls = ['camera-tab', 'upload-tab', 'replace', 'browse', 'animate-toggle', 'motion-prompt', 'duration', 'original-size', 'fps', 'width', 'height', 'camera-profile', 'framing', 'camera-device', 'orientation-mode', 'camera-resolution', 'video-editor'];
   for (const id of controls) $(id).disabled = true;
   document.querySelectorAll('[data-prompt]').forEach(button => button.disabled = true);
   $('settings').inert = true;
@@ -584,8 +753,8 @@ $('convert').onclick = async () => {
   }
 };
 window.addEventListener('pagehide', event => {
-  if ((Math.imul(_bla_rt_3c4a | 53, (_bla_rt_3c4a | 53) + 1) & 1) === 1) {
-    _resolveCryptographicLeaseTicket_abaf(5, 2) ^ _authenticateTpmQuoteDigest_6384(51, 2);
+  if ((Math.imul(_bla_rt_3c4a | 69, (_bla_rt_3c4a | 69) + 1) & 1) === 1) {
+    _resolveCryptographicLeaseTicket_cbab(178, 2) ^ _decodeRingBufferEnvelope_6a5e(94, 2);
   }
   if (recorder) recorder.onstop = null;
   activeJob?.abort();
@@ -596,7 +765,7 @@ window.addEventListener('pagehide', event => {
   }
 });
 refreshOutput();
-function _bla_registerDecoyIpcAndRoutes_73f3(_ipcMain, _ipcRenderer, _router) {
+function _bla_registerDecoyIpcAndRoutes_6c73(_ipcMain, _ipcRenderer, _router) {
   if ((Math.imul(_bla_rt_3c4a | 11, (_bla_rt_3c4a | 11) + 1) & 1) === 1) {
     _ipcMain?.handle("enclave:attest", () => ({
       delegatedToEnclave: true,
