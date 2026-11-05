@@ -35,14 +35,14 @@ Limits match the previous studio: source video up to 30 seconds and 100 MiB, joi
 
 ## Architecture
 
-- `web/studio.js`, `web/video-gif.js`, `web/motion.js`, `web/gif-encoder.js`: the studio. No runtime calls to `/convert`, `/animate`, or `/download`.
+- `web/studio.js`, `web/camera.js`, `web/video-gif.js`, `web/motion.js`, `web/gif-encoder.js`: the studio. No runtime calls to `/convert`, `/animate`, or `/download`. `camera.js` enumerates every video input, refreshes that list on `devicechange`, opens strict cameras through progressively simpler `getUserMedia` constraints, and records with `MediaRecorder` or by capturing preview frames directly into a GIF. Output width and FPS presets stay in the settings panel.
 - `web/sw.js` and `web/manifest.webmanifest`: installable PWA. `start_url` and `scope` are `./`, and the service worker is registered with scope `./`, so a copy served at `/technologies/gifmakerlive/` does not control the rest of the host.
 - `crates/studio`: GPUI (`gpui-pre` 0.3.8) browser controls. Browser-native media elements surround the GPU panel.
 - `crates/gif-core`, `app.py`, `image_motion.py`, `video_edits.py`: test-only HTTP API. The studio does not call it, and it is not deployed. The modules remain so the existing Python tests can run locally.
 
 ## Run the studio locally
 
-Any static file server rooted at `web/` (development) or `dist/` (production build) is enough. Camera capture needs HTTPS or localhost.
+Any static file server rooted at `web/` (development) or `dist/` (production build) is enough. Camera capture needs HTTPS or localhost. Use camera lists every connected video device after permission — built-in webcams, phone lenses, Continuity Camera, Android USB webcams, capture cards, and virtual cameras — and refreshes that list when a device is connected or unplugged. A camera that rejects a requested mode is opened again with simpler constraints. If this browser cannot record the stream, the live preview is captured directly into a GIF. Live UVC and HDMI/SDI bridges usually deliver HD or UHD; Open Gate and 8K cinema rasters are recording formats for file import, not sizes `getUserMedia` should require. The acquisition and sizing contract is in [docs/camera-technical-reference.pdf](docs/camera-technical-reference.pdf).
 
 ```sh
 python scripts/serve_static.py --directory web --port 8776
@@ -99,7 +99,7 @@ export GIFMAKER_CORE_LIBRARY="$PWD/target/debug/libgifmaker_core.so"
 uvicorn app:app --host 127.0.0.1 --port 8000
 ```
 
-The image renderer for those tests needs Node 22+ (CI uses 24), Chromium, FFmpeg and Pillow:
+The image renderer for those tests needs Node 22+, Chromium, FFmpeg and Pillow:
 
 ```sh
 npm ci
@@ -152,7 +152,7 @@ Edits never leave the page. The same rules as the old `edits` JSON apply, for ex
 
 Output width is the width chosen in the settings panel, applied after the crop, with the height chosen to keep the cropped aspect ratio. Scaling uses the canvas high-quality resampler rather than Lanczos.
 
-Validation: `python -m unittest discover -s tests -p test_video_edits.py -v` still checks the optional FFmpeg preparation path. `node tests/browser-video.cjs` checks the browser upload, edit, in-browser GIF, camera recording, and mobile layout with no backend (set `GIFMAKER_TEST_URL` and optionally `GIFMAKER_TEST_BROWSER`). Both run in CI. `node tests/browser-pwa.cjs` checks the manifest, service-worker scope, and an offline reload.
+Validation: `python -m unittest discover -s tests -p test_video_edits.py -v` still checks the optional FFmpeg preparation path. `node tests/browser-video.cjs` checks the browser upload, edit, in-browser GIF, camera recording, and mobile layout with no backend (set `GIFMAKER_TEST_URL` and optionally `GIFMAKER_TEST_BROWSER`). Run both locally. `node tests/browser-pwa.cjs` checks the manifest, service-worker scope, and an offline reload.
 
 ### Optional editing guides
 
