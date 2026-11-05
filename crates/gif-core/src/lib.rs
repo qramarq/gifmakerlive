@@ -4,6 +4,8 @@ use std::{
     process::{Command, Stdio},
     time::{Duration, Instant},
 };
+#[cfg_attr(not(test), allow(dead_code))]
+mod camera;
 mod motion;
 
 #[weaveffi::module]

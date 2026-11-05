@@ -4,7 +4,7 @@ window.addEventListener('message', event => {
   if (event.origin === location.origin && event.source === parent && event.data?.type === 'gif-host-query' && state) parent.postMessage({type: state}, location.origin);
 });
 try { const {default:init,run,sync_settings}=await import('./wasm/gifmaker_studio.js');await init();run();document.querySelector('#loading').remove();
-window.addEventListener('message',event=>{if(event.origin===location.origin && event.source===parent && event.data?.type==='gif-host-settings'){const {fps,width,duration,imageMode}=event.data;sync_settings(fps,width,duration,!!imageMode);}});
+window.addEventListener('message',event=>{if(event.origin===location.origin && event.source===parent && event.data?.type==='gif-host-settings'){const {fps,width,duration,imageMode,profile,framing,height,detected}=event.data;sync_settings(fps,width,duration,!!imageMode,profile||'match',framing||'crop',Number.isFinite(height)?height:0,String(detected||''));}});
 state='gif-settings-ready'; parent.postMessage({type:state},location.origin); }
 catch(error){document.querySelector('#loading').textContent='GPU controls could not load. Use the custom values below.';state='gif-settings-unavailable'; parent.postMessage({type:state},location.origin);console.error(error);}
 </script></body></html>

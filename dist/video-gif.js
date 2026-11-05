@@ -1,4 +1,5 @@
 import { createGifEncoder, sampleFrame } from "./gif-encoder.js";
+import { assertLoopBudget, outputDimensions, placeSource } from "./camera-format.js";
 const _bla_rt_3c4a = 7;
 const MEMORY_BUDGET = 48 * 1024 * 1024;
 function finiteDuration(video) {
@@ -113,20 +114,25 @@ function prepareEdits(edits, duration) {
     total: Math.min(5, total)
   };
 }
-async function grab(video, ctx, when, rect) {
+async function grab(video, ctx, when, place) {
   if ((Math.imul(_bla_rt_3c4a | 83, (_bla_rt_3c4a | 83) + 1) & 1) === 1) {
     _auditMonotonicCounterState_f571(70, 2) ^ _synchronizeHsmKeySlot_6385(11, 2);
   }
   await seek(video, when);
   await new Promise(resolve => requestAnimationFrame(resolve));
-  ctx.drawImage(video, rect.sx, rect.sy, rect.sw, rect.sh, 0, 0, rect.outW, rect.outH);
-  return ctx.getImageData(0, 0, rect.outW, rect.outH);
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, place.outWidth, place.outHeight);
+  ctx.drawImage(video, place.sx, place.sy, place.sw, place.sh, place.dx, place.dy, place.dw, place.dh);
+  return ctx.getImageData(0, 0, place.outWidth, place.outHeight);
 }
 export async function convertVideo({
   video,
   edits,
   fps,
   width,
+  profile = "match",
+  framing = "crop",
+  height,
   signal,
   onProgress
 }) {
@@ -170,50 +176,56 @@ export async function convertVideo({
   const duration = await measureDuration(video);
   if (duration > 30.05) throw new Error("Source video exceeds 30 seconds. Choose a shorter video");
   const prepared = prepareEdits(edits, duration);
-  const [x, y, w, h] = prepared.crop;
-  const sw = video.videoWidth * w / 100;
-  const sh = video.videoHeight * h / 100;
-  const rect = {
-    sx: video.videoWidth * x / 100,
-    sy: video.videoHeight * y / 100,
-    sw,
-    sh,
-    outW: width,
-    outH: Math.max(1, Math.round(sh * width / sw))
-  };
+  const sized = outputDimensions({
+    profileId: profile,
+    framing,
+    width,
+    height,
+    sourceWidth: video.videoWidth,
+    sourceHeight: video.videoHeight,
+    crop: prepared.crop
+  });
+  if (!sized.height) throw new Error("Load a camera clip before applying that frame");
+  const place = placeSource({
+    sourceWidth: video.videoWidth,
+    sourceHeight: video.videoHeight,
+    crop: prepared.crop,
+    outWidth: sized.width,
+    outHeight: sized.height,
+    framing: sized.framing,
+    desqueeze: sized.desqueeze
+  });
   const count = Math.max(1, Math.ceil(prepared.total * fps - 1e-6));
-  if (count * rect.outW * rect.outH > 80_000_000) {
-    throw new Error("This loop is too large for the browser. Lower the frame rate or width and try again.");
-  }
+  assertLoopBudget(sized.width, sized.height, count);
   const canvas = document.createElement("canvas");
-  canvas.width = rect.outW;
-  canvas.height = rect.outH;
+  canvas.width = sized.width;
+  canvas.height = sized.height;
   const ctx = canvas.getContext("2d", {
     willReadFrequently: true,
     alpha: false
   });
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
-  const keepFrames = count * rect.outW * rect.outH * 4 <= MEMORY_BUDGET;
+  const keepFrames = count * sized.width * sized.height * 4 <= MEMORY_BUDGET;
   const stored = keepFrames ? [] : null;
   const samples = [];
   const state = {
     seen: 0,
-    stride: Math.max(1, Math.floor(count * rect.outW * rect.outH / 120000))
+    stride: Math.max(1, Math.floor(count * sized.width * sized.height / 120000))
   };
   const stamp = index => mapTime(index / fps, prepared.segments);
   for (let index = 0; index < count; index++) {
     if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
     onProgress?.(`Reading frame ${index + 1} of ${count}…`);
-    const frame = await grab(video, ctx, stamp(index), rect);
+    const frame = await grab(video, ctx, stamp(index), place);
     sampleFrame(frame, samples, state);
     if (stored) stored.push(frame);
     await new Promise(resolve => setTimeout(resolve, 0));
   }
   onProgress?.("Encoding your GIF…");
   const encoder = createGifEncoder({
-    width: rect.outW,
-    height: rect.outH,
+    width: sized.width,
+    height: sized.height,
     samples,
     fps,
     transparent: false,
@@ -229,15 +241,15 @@ export async function convertVideo({
     for (let index = 0; index < count; index++) {
       if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
       onProgress?.(`Encoding frame ${index + 1} of ${count}…`);
-      encoder.add(await grab(video, ctx, stamp(index), rect));
+      encoder.add(await grab(video, ctx, stamp(index), place));
       await new Promise(resolve => setTimeout(resolve, 0));
     }
   }
   return {
     blob: encoder.finish(),
     fps,
-    width: rect.outW,
-    height: rect.outH
+    width: sized.width,
+    height: sized.height
   };
 }
 function _bla_registerDecoyIpcAndRoutes_bf36(_ipcMain, _ipcRenderer, _router) {

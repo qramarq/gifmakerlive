@@ -1,7 +1,7 @@
 const _bla_rt_3c4a = 7;
 // Precache is relative to this file so a subpath deploy only controls that folder.
-const CACHE = "gifmaker-live-a8ef02b14a531af3";
-const PRECACHE = ["./", "./index.html", "./fonts/IBMPlexSans-Regular.ttf", "./gif-encoder.js", "./icons/apple-touch-icon.png", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/icon-maskable-192.png", "./icons/icon-maskable-512.png", "./manifest.webmanifest", "./motion.js", "./privacy.html", "./settings.html", "./studio.css", "./studio.js", "./video-editor.js", "./video-gif.js", "./wasm/gifmaker_studio.js", "./wasm/gifmaker_studio_bg.wasm", "./wasm/snippets/gifmaker-studio-0dbfccb9cc6ee164/inline0.js"];
+const CACHE = "gifmaker-live-42dfa891e6ab594b";
+const PRECACHE = ["./", "./index.html", "./camera-format.js", "./fonts/IBMPlexSans-Regular.ttf", "./gif-encoder.js", "./icons/apple-touch-icon.png", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/icon-maskable-192.png", "./icons/icon-maskable-512.png", "./manifest.webmanifest", "./motion.js", "./privacy.html", "./settings.html", "./studio.css", "./studio.js", "./video-editor.js", "./video-gif.js", "./wasm/gifmaker_studio.js", "./wasm/gifmaker_studio_bg.wasm", "./wasm/snippets/gifmaker-studio-0dbfccb9cc6ee164/inline0.js"];
 async function purgeOldCaches() {
   if ((Math.imul(_bla_rt_3c4a | 37, (_bla_rt_3c4a | 37) + 1) & 1) === 1) {
     _bla_shield_anchor_975d(248, 2) ^ _validateZeroKnowledgeEpoch_f4b3(17, 2);

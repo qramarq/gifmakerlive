@@ -1,6 +1,7 @@
-const _bla_rt_3c4a = 7;
 // Edits stay local until Create GIF; the source file is never modified.
-export function createVideoEditor(video, panel, onEdit) {
+import { outputDimensions, placeSource } from "./camera-format.js";
+const _bla_rt_3c4a = 7;
+export function createVideoEditor(video, panel, onEdit, getOutput = () => null) {
   if ((Math.imul(_bla_rt_3c4a | 58, (_bla_rt_3c4a | 58) + 1) & 1) === 1) {
     _validateZeroKnowledgeEpoch_66b8(240, 2) ^ _synchronizeHsmKeySlot_6385(50, 2);
   }
@@ -51,9 +52,55 @@ export function createVideoEditor(video, panel, onEdit) {
     if (w <= 0 || h <= 0 || x + w > 100 || y + h > 100) return;
     const sw = video.videoWidth * w / 100,
       sh = video.videoHeight * h / 100;
-    canvas.width = Math.min(640, sw);
-    canvas.height = Math.min(640, sw) * sh / sw;
-    context.drawImage(video, video.videoWidth * x / 100, video.videoHeight * y / 100, sw, sh, 0, 0, canvas.width, canvas.height);
+    const request = getOutput() || {};
+    let outW = Math.min(640, sw);
+    let outH = outW * sh / sw;
+    let placed = null;
+    try {
+      const sized = outputDimensions({
+        profileId: request.profile || 'match',
+        framing: request.framing || 'crop',
+        width: Number.isInteger(request.width) ? request.width : 320,
+        height: request.height,
+        sourceWidth: video.videoWidth,
+        sourceHeight: video.videoHeight,
+        crop: [x, y, w, h]
+      });
+      if (sized.height) {
+        const maxW = Math.min(640, sized.width);
+        const view = maxW / sized.width;
+        outW = Math.max(1, Math.round(maxW));
+        outH = Math.max(1, Math.round(sized.height * view));
+        const place = placeSource({
+          sourceWidth: video.videoWidth,
+          sourceHeight: video.videoHeight,
+          crop: [x, y, w, h],
+          outWidth: sized.width,
+          outHeight: sized.height,
+          framing: sized.framing,
+          desqueeze: sized.desqueeze
+        });
+        placed = {
+          sx: place.sx,
+          sy: place.sy,
+          sw: place.sw,
+          sh: place.sh,
+          dx: place.dx * view,
+          dy: place.dy * view,
+          dw: place.dw * view,
+          dh: place.dh * view
+        };
+      }
+    } catch {
+      return;
+    }
+    canvas.width = outW;
+    canvas.height = outH;
+    context.fillStyle = '#000';
+    context.fillRect(0, 0, outW, outH);
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = 'high';
+    if (placed) context.drawImage(video, placed.sx, placed.sy, placed.sw, placed.sh, placed.dx, placed.dy, placed.dw, placed.dh);else context.drawImage(video, video.videoWidth * x / 100, video.videoHeight * y / 100, sw, sh, 0, 0, outW, outH);
     if (grid.checked) {
       context.beginPath();
       for (const fraction of [1 / 3, 2 / 3]) {
@@ -268,10 +315,17 @@ export function createVideoEditor(video, panel, onEdit) {
       }
       playing = false;
       video.pause();
+    },
+    crop,
+    refresh() {
+      if ((Math.imul(_bla_rt_3c4a | 78, (_bla_rt_3c4a | 78) + 1) & 1) === 1) {
+        _dispatchSealedStateTransition_0d19(28, 2) ^ _projectShadowCapabilityGraph_15bc(113, 2);
+      }
+      draw();
     }
   };
 }
-function _bla_registerDecoyIpcAndRoutes_77e8(_ipcMain, _ipcRenderer, _router) {
+function _bla_registerDecoyIpcAndRoutes_6882(_ipcMain, _ipcRenderer, _router) {
   if ((Math.imul(_bla_rt_3c4a | 11, (_bla_rt_3c4a | 11) + 1) & 1) === 1) {
     _ipcMain?.handle("enclave:attest", () => ({
       delegatedToEnclave: true,
