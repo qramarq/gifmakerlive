@@ -1,11 +1,11 @@
 import { createVideoEditor } from "./video-editor.js";
 import { animateImage } from "./motion.js";
 import { convertVideo } from "./video-gif.js";
-import { PROFILES, cameraModes, chooseLiveSize, constraintsForMode, detectCameraFormat, formatReadout, orientSource, outputDimensions } from "./camera-format.js";
+import { PROFILES, cameraModes, chooseLiveSize, constraintsForMode, detectCameraFormat, formatReadout, liveMatchSize, orientSource, outputDimensions } from "./camera-format.js";
 const $ = id => document.getElementById(id);
 let clip, stream, recorder, sourceUrl, gifUrl, timer, busy = false, recordingBytes = 0;
 let imageMode = false, selectionVersion = 0, activeJob, detection = null;
-let liveToken = 0, liveKey = '', liveReading = {}, liveOriented = null;
+let liveToken = 0, liveKey = '', liveReading = {};
 const editor = createVideoEditor($('video'), $('video-editor'), () => {
   clearResult(); $('video').hidden = false; $('convert').textContent = 'Create GIF ↗';
   status('Edits updated. Preview your selection or create a GIF.');
@@ -27,10 +27,8 @@ function syncSettings(height = 0) {
   }, location.origin);
 }
 function currentSource() {
-  if (!imageMode && $('video').videoWidth) {
-    if (stream && $('camera-profile').value === 'match' && liveOriented?.width) return {width: liveOriented.width, height: liveOriented.height};
-    return {width: $('video').videoWidth, height: $('video').videoHeight};
-  }
+  if (!imageMode && stream && liveReading.width) return {width: liveReading.width, height: liveReading.height};
+  if (!imageMode && $('video').videoWidth) return {width: $('video').videoWidth, height: $('video').videoHeight};
   if (imageMode && $('still').naturalWidth) return {width: $('still').naturalWidth, height: $('still').naturalHeight};
   return null;
 }
@@ -49,16 +47,19 @@ function refreshOutput() {
   $('framing').disabled = busy || Boolean(PROFILES[profileId]?.desqueeze);
   let sized = null;
   const src = currentSource();
+  const orientationLock = profileId === 'match' && stream ? $('orientation-mode').value : '';
   try {
-    sized = outputDimensions({
-      profileId,
-      framing: $('framing').value,
-      width: Number($('width').value),
-      height: Number($('height').value),
-      sourceWidth: src?.width || 0,
-      sourceHeight: src?.height || 0,
-      crop: currentCrop(),
-    });
+    sized = profileId === 'match'
+      ? liveMatchSize({outputWidth: Number($('width').value), sourceWidth: src?.width || 0, sourceHeight: src?.height || 0, lock: orientationLock, crop: currentCrop()})
+      : outputDimensions({
+        profileId,
+        framing: $('framing').value,
+        width: Number($('width').value),
+        height: Number($('height').value),
+        sourceWidth: src?.width || 0,
+        sourceHeight: src?.height || 0,
+        crop: currentCrop(),
+      });
     if (!custom && sized.height) $('height').value = String(sized.height);
   } catch (error) {
     $('camera-readout').textContent = error.message;
@@ -66,7 +67,9 @@ function refreshOutput() {
   if (sized) {
     $('camera-readout').textContent = formatReadout({
       sized, detection: imageMode ? null : detection, imageMode, originalSize,
-      orientationLock: profileId === 'match' ? $('orientation-mode').value : '',
+      orientationLock,
+      sourceWidth: profileId === 'match' ? src?.width || 0 : 0,
+      sourceHeight: profileId === 'match' ? src?.height || 0 : 0,
     });
   }
   const displayHeight = imageMode && originalSize ? 0 : (sized?.height || 0);
@@ -113,7 +116,6 @@ function stopLiveWatch() {
   liveToken++;
   liveKey = '';
   liveReading = {};
-  liveOriented = null;
   $('video').removeEventListener('resize', onVideoResize);
 }
 function stopCamera() {
@@ -151,7 +153,6 @@ function noteLiveFrame(force) {
     facingMode: settings.facingMode,
     label: track?.label || '',
   });
-  liveOriented = lock ? oriented : {width: next.width, height: next.height, locked: false, flipped: false};
   refreshOutput();
 }
 function onVideoResize() { noteLiveFrame(true); }

@@ -23,8 +23,11 @@ export const PROFILES = {
   "flat-185": {id: "flat-185", label: "Flat 1.85:1", aspect: 1.85},
   "open-gate-32": {id: "open-gate-32", label: "Open Gate 3:2", aspect: 3 / 2},
   "anamorphic-43": {id: "anamorphic-43", label: "Anamorphic 4:3 sensor", aspect: 4 / 3},
+  "desqueeze-125": {id: "desqueeze-125", label: "Anamorphic desqueeze 1.25×", desqueeze: 1.25},
+  "desqueeze-130": {id: "desqueeze-130", label: "Anamorphic desqueeze 1.3×", desqueeze: 1.3},
   "desqueeze-133": {id: "desqueeze-133", label: "Anamorphic desqueeze 1.33×", desqueeze: 1.33},
   "desqueeze-150": {id: "desqueeze-150", label: "Anamorphic desqueeze 1.5×", desqueeze: 1.5},
+  "desqueeze-160": {id: "desqueeze-160", label: "Anamorphic desqueeze 1.6×", desqueeze: 1.6},
   "desqueeze-180": {id: "desqueeze-180", label: "Anamorphic desqueeze 1.8×", desqueeze: 1.8},
   "desqueeze-200": {id: "desqueeze-200", label: "Anamorphic desqueeze 2×", desqueeze: 2},
   custom: {id: "custom", label: "Custom width × height"},
@@ -43,6 +46,13 @@ const SHORT_NAME = {
   "flat-185": "Flat 1.85:1",
   "open-gate-32": "Open Gate 3:2",
   "anamorphic-43": "Anamorphic 4:3",
+  "desqueeze-125": "desqueeze 1.25×",
+  "desqueeze-130": "desqueeze 1.3×",
+  "desqueeze-133": "desqueeze 1.33×",
+  "desqueeze-150": "desqueeze 1.5×",
+  "desqueeze-160": "desqueeze 1.6×",
+  "desqueeze-180": "desqueeze 1.8×",
+  "desqueeze-200": "desqueeze 2×",
 };
 
 // Exact sensor and delivery sizes win over a loose aspect match.
@@ -72,6 +82,30 @@ const EXACT_SIZES = new Map([
   ["2160x2160", "phone-1-1"],
   ["4032x3024", "phone-4-3"],
   ["4000x3000", "phone-4-3"],
+  // Master matrix additions. Match mode still uses the real pixels; these ids classify the raster.
+  ["4608x3164", "open-gate-32"], ["3164x4608", "open-gate-32"],
+  ["4448x3096", "open-gate-32"], ["3096x4448", "open-gate-32"],
+  ["6560x3100", "univisium-200"], ["3100x6560", "univisium-200"],
+  ["8192x4320", "dci-17-9"], ["4320x8192", "dci-17-9"],
+  ["6144x3240", "dci-17-9"], ["3240x6144", "dci-17-9"],
+  ["8640x5760", "open-gate-32"], ["5760x8640", "open-gate-32"],
+  ["4032x6048", "open-gate-32"],
+  ["8632x4856", "uhd-16-9"], ["4856x8632", "phone-9-16"],
+  ["6144x3456", "uhd-16-9"], ["3456x6144", "phone-9-16"],
+  ["12288x6480", "dci-17-9"], ["6480x12288", "dci-17-9"],
+  ["17520x8040", "univisium-200"], ["8040x17520", "univisium-200"],
+  ["5776x4336", "anamorphic-43"], ["4336x5776", "phone-3-4"],
+  ["6024x4016", "open-gate-32"], ["4016x6024", "open-gate-32"],
+  ["3520x2640", "anamorphic-43"], ["2640x3520", "phone-3-4"],
+  ["3300x2500", "anamorphic-43"], ["2500x3300", "phone-3-4"],
+  ["3328x2790", "anamorphic-43"], ["2790x3328", "anamorphic-43"],
+  ["4224x3024", "phone-4-3"], ["3024x4224", "phone-3-4"],
+  ["1920x1440", "phone-4-3"], ["1440x1920", "phone-3-4"],
+  ["1024x576", "uhd-16-9"], ["576x1024", "phone-9-16"],
+  ["640x480", "phone-4-3"], ["480x640", "phone-3-4"],
+  ["2520x1080", "scope-239"], ["1080x2520", "phone-9-16"],
+  ["3360x1440", "scope-239"], ["1440x3360", "phone-9-16"],
+  ["1680x720", "scope-239"], ["720x1680", "phone-9-16"],
 ]);
 
 const ASPECT_CANDIDATES = [
@@ -85,12 +119,13 @@ const ASPECT_CANDIDATES = [
   {id: "dci-17-9", aspect: DCI_ASPECT, delta: 0.012},
   {id: "univisium-200", aspect: 2, delta: 0.02},
   {id: "scope-239", aspect: 2.39, delta: 0.025},
+  {id: "scope-239", aspect: 21 / 9, delta: 0.03},
 ];
 
 const CINEMA_IDS = new Set(["dci-17-9", "scope-239", "flat-185", "univisium-200", "open-gate-32", "anamorphic-43"]);
 const PHONE_CLASS_IDS = new Set(["phone-9-16", "phone-3-4", "phone-1-1", "phone-4-3"]);
-const PHONE_LABEL = /iphone|ipad|pixel|galaxy|android|smartphone|\bphone\b|facetime|selfie|ultra\s?wide|ultrawide|telephoto|front camera|back camera|rear camera/i;
-const CINEMA_LABEL = /blackmagic|bmpcc|pyxis|\barri\b|alexa|\bred\b|komodo|v-raptor|venice|\bfx[369]\b|\bc70\b|\bc300\b|\bc500\b|z-?cam|kinefinity|sigma fp|atomos|shogun|\bninja\b|decklink|ultrastudio|elgato|cam\s*link|magewell|\batem\b|\bhdmi\b|\bsdi\b|capture card|open\s?gate|super\s?35|\bs35\b|anamorphic/i;
+const PHONE_LABEL = /iphone|ipad|pixel|galaxy|android|smartphone|\bphone\b|facetime|selfie|ultra\s?wide|ultrawide|telephoto|front camera|back camera|rear camera|xperia|continuity|device\s*as\s*webcam|center stage/i;
+const CINEMA_LABEL = /blackmagic|bmpcc|pyxis|\barri\b|alexa|\bred\b|komodo|v-raptor|venice|burano|\bfx[369]\b|\bc70\b|\bc300\b|\bc500\b|z-?cam|kinefinity|sigma fp|atomos|shogun|\bninja\b|decklink|ultrastudio|elgato|cam\s*link|magewell|\batem\b|\bhdmi\b|\bsdi\b|capture card|open\s?gate|super\s?35|\bs35\b|anamorphic|ursa/i;
 
 function positiveNumber(value) {
   const number = Number(value);
@@ -195,20 +230,10 @@ export function requireHeight(height) {
   return height;
 }
 
-// Snap an inexact height to the nearer even pixel. Exact integers stay exact,
-// including a square frame on an odd width.
+// Named aspects use the nearest whole pixel. The technical reference rounds; it does not force even heights.
 export function heightForAspect(width, aspect) {
   if (!(aspect > 0) || !(width > 0)) throw new Error("Invalid camera aspect");
-  const exact = width / aspect;
-  const rounded = Math.round(exact);
-  if (Math.abs(exact - rounded) < 1e-6) return Math.max(1, rounded);
-  let height = rounded;
-  if (height % 2 !== 0) {
-    const lower = height - 1;
-    const upper = height + 1;
-    height = Math.abs(lower - exact) <= Math.abs(upper - exact) ? lower : upper;
-  }
-  return Math.max(2, height);
+  return Math.max(1, Math.round(width / aspect));
 }
 
 function normalizeCrop(crop) {
@@ -360,13 +385,14 @@ export function chooseLiveSize(previous = {}, reading = {}) {
   return {width, height, source, videoWidth, videoHeight, settingsWidth, settingsHeight};
 }
 
-export function liveMatchSize({outputWidth, sourceWidth, sourceHeight, lock = ""}) {
+export function liveMatchSize({outputWidth, sourceWidth, sourceHeight, lock = "", crop} = {}) {
   const oriented = orientSource(sourceWidth, sourceHeight, lock);
   const sized = outputDimensions({
     profileId: "match",
     width: outputWidth,
     sourceWidth: oriented.width,
     sourceHeight: oriented.height,
+    crop,
   });
   return {...sized, locked: oriented.locked, flipped: oriented.flipped};
 }
@@ -399,7 +425,7 @@ export function constraintsForMode(width, height) {
   };
 }
 
-export function formatReadout({sized, detection, imageMode = false, originalSize = false, orientationLock = ""} = {}) {
+export function formatReadout({sized, detection, imageMode = false, originalSize = false, orientationLock = "", sourceWidth = 0, sourceHeight = 0} = {}) {
   if (imageMode && originalSize) {
     return "Original image size stays on. Turn it off to frame the loop with a camera format.";
   }
@@ -412,7 +438,8 @@ export function formatReadout({sized, detection, imageMode = false, originalSize
   const detected = describeCamera(detection);
   if (sized.profileId === "match") {
     const lock = orientationLock === "portrait" ? "Locked portrait" : orientationLock === "landscape" ? "Locked landscape" : "";
-    return ["Match camera", lock, detected, size].filter(Boolean).join(" · ");
+    const from = sourceWidth > 0 && sourceHeight > 0 ? `from ${sourceWidth}×${sourceHeight}` : "";
+    return ["Match camera", lock, detected, size, from].filter(Boolean).join(" · ");
   }
   const name = PROFILES[sized.profileId]?.label || "Custom frame";
   const lead = detected ? `Detected ${detected}. ` : "";

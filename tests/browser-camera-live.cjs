@@ -93,6 +93,35 @@ const assert = require('node:assert/strict');
     await page.waitForFunction(() => document.querySelector('#height').value === '180');
     assert.match(await page.locator('#camera-readout').innerText(), /16:9/);
     assert.equal(await page.evaluate(() => window.__gifSettings.height), 180);
+
+    await page.locator('#camera-profile').selectOption('match');
+    const matrix = [
+      [6144, 3240, 'DCI 17:9'],
+      [8192, 4320, 'DCI 17:9'],
+      [4608, 3164, 'Open Gate'],
+      [4448, 3096, 'Open Gate'],
+      [4224, 3024, '4:3'],
+      [1920, 1440, '4:3'],
+      [1024, 576, '16:9'],
+      [6144, 3456, '16:9'],
+      [8632, 4856, '16:9'],
+      [6560, 3100, '2.00:1'],
+      [12288, 6480, 'DCI 17:9'],
+    ];
+    for (const [width, height, label] of matrix) {
+      await page.evaluate(({width, height}) => window.__setCameraSize(width, height), {width, height});
+      await page.waitForFunction(({width, height, label}) => {
+        const text = document.querySelector('#camera-readout').textContent;
+        return text.includes(`${width}×${height}`) && text.includes(label);
+      }, {width, height, label});
+    }
+    await page.locator('#camera-profile').selectOption('desqueeze-125');
+    await page.evaluate(() => window.__setCameraSize(2880, 2160));
+    await page.waitForFunction(() => document.querySelector('#height').value === '192');
+    for (const [id, height] of [['desqueeze-130', '185'], ['desqueeze-133', '180'], ['desqueeze-150', '160'], ['desqueeze-160', '150'], ['desqueeze-180', '133'], ['desqueeze-200', '120']]) {
+      await page.locator('#camera-profile').selectOption(id);
+      await page.waitForFunction(expected => document.querySelector('#height').value === expected, height);
+    }
     assert.deepEqual(errors, []);
     console.log('PASS: live rotation, DCI resize, orientation lock, and resolution change update GIF output');
   } finally {

@@ -41,8 +41,11 @@ fn known_profile(profile: &str) -> bool {
             | "flat-185"
             | "open-gate-32"
             | "anamorphic-43"
+            | "desqueeze-125"
+            | "desqueeze-130"
             | "desqueeze-133"
             | "desqueeze-150"
+            | "desqueeze-160"
             | "desqueeze-180"
             | "desqueeze-200"
             | "custom"
@@ -64,8 +67,11 @@ fn profile_label(profile: &str) -> &'static str {
         "flat-185" => "1.85:1",
         "open-gate-32" => "OPEN GATE 3:2",
         "anamorphic-43" => "ANAMORPHIC 4:3",
+        "desqueeze-125" => "DESQUEEZE 1.25×",
+        "desqueeze-130" => "DESQUEEZE 1.3×",
         "desqueeze-133" => "DESQUEEZE 1.33×",
         "desqueeze-150" => "DESQUEEZE 1.5×",
+        "desqueeze-160" => "DESQUEEZE 1.6×",
         "desqueeze-180" => "DESQUEEZE 1.8×",
         "desqueeze-200" => "DESQUEEZE 2×",
         "custom" => "CUSTOM",
@@ -196,6 +202,16 @@ impl Render for Studio {
                     .child(self.chip("cam-scope", "Scope", self.profile == "scope-239").on_click(cx.listener(|s, _, _, cx| {s.profile="scope-239".into(); s.publish("camera"); cx.notify();})))
                     .child(self.chip("cam-flat", "1.85", self.profile == "flat-185").on_click(cx.listener(|s, _, _, cx| {s.profile="flat-185".into(); s.publish("camera"); cx.notify();})))
                     .child(self.chip("cam-gate", "3:2", self.profile == "open-gate-32").on_click(cx.listener(|s, _, _, cx| {s.profile="open-gate-32".into(); s.publish("camera"); cx.notify();}))))
+                .child(div().text_sm().child("Anamorphic desqueeze"))
+                .child(div().flex().gap_2()
+                    .child(self.chip("ds-125", "1.25", self.profile == "desqueeze-125").on_click(cx.listener(|s, _, _, cx| {s.profile="desqueeze-125".into(); s.publish("camera"); cx.notify();})))
+                    .child(self.chip("ds-130", "1.3", self.profile == "desqueeze-130").on_click(cx.listener(|s, _, _, cx| {s.profile="desqueeze-130".into(); s.publish("camera"); cx.notify();})))
+                    .child(self.chip("ds-133", "1.33", self.profile == "desqueeze-133").on_click(cx.listener(|s, _, _, cx| {s.profile="desqueeze-133".into(); s.publish("camera"); cx.notify();})))
+                    .child(self.chip("ds-150", "1.5", self.profile == "desqueeze-150").on_click(cx.listener(|s, _, _, cx| {s.profile="desqueeze-150".into(); s.publish("camera"); cx.notify();}))))
+                .child(div().flex().gap_2()
+                    .child(self.chip("ds-160", "1.6", self.profile == "desqueeze-160").on_click(cx.listener(|s, _, _, cx| {s.profile="desqueeze-160".into(); s.publish("camera"); cx.notify();})))
+                    .child(self.chip("ds-180", "1.8", self.profile == "desqueeze-180").on_click(cx.listener(|s, _, _, cx| {s.profile="desqueeze-180".into(); s.publish("camera"); cx.notify();})))
+                    .child(self.chip("ds-200", "2×", self.profile == "desqueeze-200").on_click(cx.listener(|s, _, _, cx| {s.profile="desqueeze-200".into(); s.publish("camera"); cx.notify();}))))
                 .child(div().text_sm().child("Framing"))
                 .child(div().flex().gap_2()
                     .child(self.chip("frame-crop", "Crop to fill", self.framing == "crop").on_click(cx.listener(|s, _, _, cx| {s.framing="crop".into(); s.publish("framing"); cx.notify();})))

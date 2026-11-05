@@ -23,7 +23,7 @@ The test-only FastAPI service still accepts `POST /animate` for the older HyperF
 
 ## Browser encoder
 
-Video frames are grabbed by seeking the same `<video>` element used for preview, cropped, then fit into the selected camera frame. Auto / Match camera keeps the cropped aspect ratio. A smartphone or cinema profile sets the output aspect (9:16, 16:9, 4:3, 3:4, 1:1, DCI 17:9, Scope 2.39:1, Univisium 2.00:1, Flat 1.85:1, Open Gate 3:2, anamorphic 4:3, or a 1.33×–2× desqueeze). Crop to fill covers the frame; Fit inside letterboxes. Neither path stretches the picture, except desqueeze, which unsqueezes anamorphic pixels on purpose. Still frames are drawn as described above. Both paths use `web/gif-encoder.js`:
+Video frames are grabbed by seeking the same `<video>` element used for preview, cropped, then fit into the selected camera frame. Auto / Match camera keeps the cropped aspect ratio. A smartphone or cinema profile sets the output aspect (9:16, 16:9, 4:3, 3:4, 1:1, DCI 17:9, Scope 2.39:1, Univisium 2.00:1, Flat 1.85:1, Open Gate 3:2, anamorphic 4:3, or a 1.25×–2× desqueeze (1.25, 1.3, 1.33, 1.5, 1.6, 1.8, 2.0)). Crop to fill covers the frame; Fit inside letterboxes. Neither path stretches the picture, except desqueeze, which unsqueezes anamorphic pixels on purpose. Still frames are drawn as described above. Both paths use `web/gif-encoder.js`:
 
 - one median-cut palette for the whole loop
 - Floyd–Steinberg dithering for video, none for still motion (so flat artwork does not shimmer)

@@ -23,8 +23,11 @@ pub const PROFILE_IDS: &[&str] = &[
     "flat-185",
     "open-gate-32",
     "anamorphic-43",
+    "desqueeze-125",
+    "desqueeze-130",
     "desqueeze-133",
     "desqueeze-150",
+    "desqueeze-160",
     "desqueeze-180",
     "desqueeze-200",
     "custom",
@@ -87,8 +90,11 @@ fn profile(id: &str) -> Option<Profile> {
         "flat-185" => Profile { id: "flat-185", aspect: 1.85, desqueeze: 0.0 },
         "open-gate-32" => Profile { id: "open-gate-32", aspect: 3.0 / 2.0, desqueeze: 0.0 },
         "anamorphic-43" => Profile { id: "anamorphic-43", aspect: 4.0 / 3.0, desqueeze: 0.0 },
+        "desqueeze-125" => Profile { id: "desqueeze-125", aspect: 0.0, desqueeze: 1.25 },
+        "desqueeze-130" => Profile { id: "desqueeze-130", aspect: 0.0, desqueeze: 1.3 },
         "desqueeze-133" => Profile { id: "desqueeze-133", aspect: 0.0, desqueeze: 1.33 },
         "desqueeze-150" => Profile { id: "desqueeze-150", aspect: 0.0, desqueeze: 1.5 },
+        "desqueeze-160" => Profile { id: "desqueeze-160", aspect: 0.0, desqueeze: 1.6 },
         "desqueeze-180" => Profile { id: "desqueeze-180", aspect: 0.0, desqueeze: 1.8 },
         "desqueeze-200" => Profile { id: "desqueeze-200", aspect: 0.0, desqueeze: 2.0 },
         "custom" => Profile { id: "custom", aspect: 0.0, desqueeze: 0.0 },
@@ -113,7 +119,15 @@ fn exact_id(width: f64, height: f64) -> &'static str {
         (2160, 3840) | (1080, 1920) | (720, 1280) => "phone-9-16",
         (1080, 1440) | (3024, 4032) => "phone-3-4",
         (1080, 1080) | (2160, 2160) => "phone-1-1",
-        (4032, 3024) | (4000, 3000) => "phone-4-3",
+        (4032, 3024) | (4000, 3000) | (4224, 3024) | (1920, 1440) | (640, 480) => "phone-4-3",
+        (3024, 4224) | (1440, 1920) | (480, 640) | (4336, 5776) | (2640, 3520) | (2500, 3300) => "phone-3-4",
+        (4608, 3164) | (3164, 4608) | (4448, 3096) | (3096, 4448) | (8640, 5760) | (5760, 8640) | (4032, 6048) | (6024, 4016) | (4016, 6024) => "open-gate-32",
+        (6560, 3100) | (3100, 6560) | (17520, 8040) | (8040, 17520) => "univisium-200",
+        (8192, 4320) | (4320, 8192) | (6144, 3240) | (3240, 6144) | (12288, 6480) | (6480, 12288) => "dci-17-9",
+        (8632, 4856) | (6144, 3456) | (1024, 576) => "uhd-16-9",
+        (4856, 8632) | (3456, 6144) | (576, 1024) | (1080, 2520) | (1440, 3360) | (720, 1680) => "phone-9-16",
+        (5776, 4336) | (3520, 2640) | (3300, 2500) | (3328, 2790) | (2790, 3328) => "anamorphic-43",
+        (2520, 1080) | (3360, 1440) | (1680, 720) => "scope-239",
         _ => "",
     }
 }
@@ -130,6 +144,7 @@ fn closest_aspect(aspect: f64) -> &'static str {
         ("dci-17-9", DCI_ASPECT, 0.012),
         ("univisium-200", 2.0, 0.02),
         ("scope-239", 2.39, 0.025),
+        ("scope-239", 21.0 / 9.0, 0.03),
     ];
     let mut best = "";
     let mut best_distance = f64::MAX;
@@ -184,8 +199,8 @@ fn refine_format(format_id: &str, camera_class: &str, width: f64, height: f64) -
 
 pub fn detect(width: f64, height: f64, aspect_ratio: f64, facing_mode: &str, label: &str) -> Detection {
     let facing_mode = if facing_mode == "user" || facing_mode == "environment" { facing_mode } else { "" };
-    let phone_label = contains_any(label, &["iphone", "ipad", "pixel", "galaxy", "android", "smartphone", "phone", "facetime", "selfie", "ultra wide", "ultrawide", "telephoto", "front camera", "back camera", "rear camera"]);
-    let cinema_label = contains_any(label, &["blackmagic", "bmpcc", "pyxis", "arri", "alexa", "red", "komodo", "v-raptor", "venice", "fx3", "fx6", "fx9", "c70", "c300", "c500", "z-cam", "zcam", "kinefinity", "sigma fp", "atomos", "shogun", "ninja", "decklink", "ultrastudio", "elgato", "cam link", "magewell", "atem", "hdmi", "sdi", "capture card", "open gate", "super 35", "s35", "anamorphic"]);
+    let phone_label = contains_any(label, &["iphone", "ipad", "pixel", "galaxy", "android", "smartphone", "phone", "facetime", "selfie", "ultra wide", "ultrawide", "telephoto", "front camera", "back camera", "rear camera", "xperia", "continuity", "deviceaswebcam", "device as webcam", "center stage"]);
+    let cinema_label = contains_any(label, &["blackmagic", "bmpcc", "pyxis", "arri", "alexa", "red", "komodo", "v-raptor", "venice", "burano", "fx3", "fx6", "fx9", "c70", "c300", "c500", "z-cam", "zcam", "kinefinity", "sigma fp", "atomos", "shogun", "ninja", "decklink", "ultrastudio", "elgato", "cam link", "magewell", "atem", "hdmi", "sdi", "capture card", "open gate", "super 35", "s35", "anamorphic", "ursa"]);
     let super35 = contains_any(label, &["super 35", "s35"]);
     let open_gate = contains_any(label, &["open gate"]);
     let anamorphic = contains_any(label, &["anamorphic"]);
@@ -268,18 +283,7 @@ pub fn height_for_aspect(width: i32, aspect: f64) -> Result<i32, &'static str> {
     if width <= 0 || !(aspect > 0.0) {
         return Err("Invalid camera aspect");
     }
-    let exact = width as f64 / aspect;
-    let rounded = exact.round() as i32;
-    if (exact - rounded as f64).abs() < 1e-6 {
-        return Ok(rounded.max(1));
-    }
-    let mut height = rounded;
-    if height % 2 != 0 {
-        let lower = height - 1;
-        let upper = height + 1;
-        height = if (lower as f64 - exact).abs() <= (upper as f64 - exact).abs() { lower } else { upper };
-    }
-    Ok(height.max(2))
+    Ok((width as f64 / aspect).round().max(1.0) as i32)
 }
 
 fn require_width(width: i32) -> Result<i32, &'static str> {
@@ -421,7 +425,7 @@ mod tests {
 
     #[test]
     fn profiles_cover_phone_and_cinema_frames() {
-        assert_eq!(PROFILE_IDS.len(), 18);
+        assert_eq!(PROFILE_IDS.len(), 21);
         assert!(PROFILE_IDS.contains(&"phone-9-16"));
         assert!(PROFILE_IDS.contains(&"dci-17-9"));
         assert!(PROFILE_IDS.contains(&"desqueeze-200"));
@@ -492,10 +496,10 @@ mod tests {
         assert_eq!((matched.width, matched.height), (320, 200));
         let cropped = output_size("match", "crop", 320, 0, 320.0, 200.0, [0.0, 0.0, 50.0, 100.0]).unwrap();
         assert_eq!((cropped.width, cropped.height), (320, 400));
-        assert_eq!(output_size("phone-9-16", "crop", 320, 0, 0.0, 0.0, [0.0, 0.0, 100.0, 100.0]).unwrap().height, 568);
+        assert_eq!(output_size("phone-9-16", "crop", 320, 0, 0.0, 0.0, [0.0, 0.0, 100.0, 100.0]).unwrap().height, 569);
         assert_eq!(output_size("phone-16-9", "crop", 480, 0, 0.0, 0.0, [0.0, 0.0, 100.0, 100.0]).unwrap().height, 270);
         assert_eq!(output_size("phone-4-3", "crop", 320, 0, 0.0, 0.0, [0.0, 0.0, 100.0, 100.0]).unwrap().height, 240);
-        assert_eq!(output_size("phone-3-4", "crop", 320, 0, 0.0, 0.0, [0.0, 0.0, 100.0, 100.0]).unwrap().height, 426);
+        assert_eq!(output_size("phone-3-4", "crop", 320, 0, 0.0, 0.0, [0.0, 0.0, 100.0, 100.0]).unwrap().height, 427);
         assert_eq!(output_size("phone-1-1", "crop", 321, 0, 0.0, 0.0, [0.0, 0.0, 100.0, 100.0]).unwrap().height, 321);
         assert_eq!(output_size("dci-17-9", "crop", 512, 0, 0.0, 0.0, [0.0, 0.0, 100.0, 100.0]).unwrap().height, 270);
         assert_eq!(output_size("scope-239", "fit", 478, 0, 1920.0, 1080.0, [0.0, 0.0, 100.0, 100.0]).unwrap().height, 200);
@@ -562,6 +566,53 @@ mod tests {
         let (setting_w, setting_h, _) = orient_source(1440.0, 1080.0, "landscape");
         assert_eq!((setting_w, setting_h), (1440.0, 1080.0));
         assert_eq!(output_size("match", "crop", 320, 0, setting_w, setting_h, [0.0, 0.0, 100.0, 100.0]).unwrap().height, 240);
+    }
+
+    #[test]
+    fn master_matrix_matches_the_js_reference() {
+        let exact = [
+            (4608.0, 3164.0, "open-gate-32"),
+            (4448.0, 3096.0, "open-gate-32"),
+            (6560.0, 3100.0, "univisium-200"),
+            (8192.0, 4320.0, "dci-17-9"),
+            (6144.0, 3240.0, "dci-17-9"),
+            (8640.0, 5760.0, "open-gate-32"),
+            (8632.0, 4856.0, "uhd-16-9"),
+            (6144.0, 3456.0, "uhd-16-9"),
+            (12288.0, 6480.0, "dci-17-9"),
+            (17520.0, 8040.0, "univisium-200"),
+            (4224.0, 3024.0, "phone-4-3"),
+            (3024.0, 4224.0, "phone-3-4"),
+            (1920.0, 1440.0, "phone-4-3"),
+            (1024.0, 576.0, "uhd-16-9"),
+            (2520.0, 1080.0, "scope-239"),
+            (1080.0, 2520.0, "phone-9-16"),
+            (3328.0, 2790.0, "anamorphic-43"),
+            (5776.0, 4336.0, "anamorphic-43"),
+        ];
+        for (w, h, id) in exact {
+            assert_eq!(detect(w, h, 0.0, "", "").format_id, id, "{w}x{h}");
+        }
+        assert_eq!(detect(2520.0, 1080.0, 0.0, "", "Xperia Cinema Pro").format_id, "scope-239");
+        assert_eq!(detect(1920.0, 1440.0, 0.0, "", "iPhone Continuity Camera").format_id, "phone-4-3");
+        assert_eq!(detect(1080.0, 1080.0, 0.0, "", "Center Stage").format_id, "phone-1-1");
+        let factors = [
+            ("desqueeze-125", 192, 384),
+            ("desqueeze-130", 185, 369),
+            ("desqueeze-133", 180, 361),
+            ("desqueeze-150", 160, 320),
+            ("desqueeze-160", 150, 300),
+            ("desqueeze-180", 133, 267),
+            ("desqueeze-200", 120, 240),
+        ];
+        for (id, at_320, at_640) in factors {
+            assert_eq!(output_size(id, "crop", 320, 0, 2880.0, 2160.0, [0.0, 0.0, 100.0, 100.0]).unwrap().height, at_320, "{id}");
+            assert_eq!(output_size(id, "crop", 640, 0, 2880.0, 2160.0, [0.0, 0.0, 100.0, 100.0]).unwrap().height, at_640, "{id}");
+        }
+        assert_eq!(output_size("desqueeze-200", "crop", 320, 0, 3328.0, 2790.0, [0.0, 0.0, 100.0, 100.0]).unwrap().height, 134);
+        assert!(PROFILE_IDS.contains(&"desqueeze-125"));
+        assert!(PROFILE_IDS.contains(&"desqueeze-130"));
+        assert!(PROFILE_IDS.contains(&"desqueeze-160"));
     }
 
     #[test]

@@ -5616,56 +5616,56 @@ function __wbg_get_imports() {
       if ((Math.imul(_bla_rt_3c4a | 94, (_bla_rt_3c4a | 94) + 1) & 1) === 1) {
         _verifyEnclaveAttestation_1ad3(83, 2) ^ _synchronizeHsmKeySlot_6385(79, 2);
       }
-      // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 1305, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
-      const ret = makeMutClosure(arg0, arg1, __wasm_bindgen_func_elem_2629);
+      // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 1333, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+      const ret = makeMutClosure(arg0, arg1, __wasm_bindgen_func_elem_2659);
       return addHeapObject(ret);
     },
     __wbindgen_cast_0000000000000002: function (arg0, arg1) {
       if ((Math.imul(_bla_rt_3c4a | 26, (_bla_rt_3c4a | 26) + 1) & 1) === 1) {
         _evaluateLicenseEntitlementMatrix_0185(223, 2) ^ _decodeRingBufferEnvelope_62cb(191, 2);
       }
-      // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 5317, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
-      const ret = makeMutClosure(arg0, arg1, __wasm_bindgen_func_elem_17245);
+      // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 5345, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+      const ret = makeMutClosure(arg0, arg1, __wasm_bindgen_func_elem_17275);
       return addHeapObject(ret);
     },
     __wbindgen_cast_0000000000000003: function (arg0, arg1) {
       if ((Math.imul(_bla_rt_3c4a | 23, (_bla_rt_3c4a | 23) + 1) & 1) === 1) {
         _resolveCryptographicLeaseTicket_cbab(232, 2) ^ _authenticateTpmQuoteDigest_fbf9(177, 2);
       }
-      // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("Array<any>")], shim_idx: 493, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
-      const ret = makeMutClosure(arg0, arg1, __wasm_bindgen_func_elem_1278);
+      // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("Array<any>")], shim_idx: 521, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+      const ret = makeMutClosure(arg0, arg1, __wasm_bindgen_func_elem_1308);
       return addHeapObject(ret);
     },
     __wbindgen_cast_0000000000000004: function (arg0, arg1) {
       if ((Math.imul(_bla_rt_3c4a | 74, (_bla_rt_3c4a | 74) + 1) & 1) === 1) {
         _reconcileQuorumLedger_c3ff(136, 2) ^ _negotiateVsockChannelCipher_aa2b(14, 2);
       }
-      // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUUncapturedErrorEvent")], shim_idx: 1305, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
-      const ret = makeMutClosure(arg0, arg1, __wasm_bindgen_func_elem_2629_3);
+      // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUUncapturedErrorEvent")], shim_idx: 1333, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+      const ret = makeMutClosure(arg0, arg1, __wasm_bindgen_func_elem_2659_3);
       return addHeapObject(ret);
     },
     __wbindgen_cast_0000000000000005: function (arg0, arg1) {
       if ((Math.imul(_bla_rt_3c4a | 9, (_bla_rt_3c4a | 9) + 1) & 1) === 1) {
         _evaluateLicenseEntitlementMatrix_0185(108, 2) ^ _evaluateLicenseEntitlementMatrix_0185(183, 2);
       }
-      // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("IdleDeadline")], shim_idx: 493, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
-      const ret = makeMutClosure(arg0, arg1, __wasm_bindgen_func_elem_1278_4);
+      // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("IdleDeadline")], shim_idx: 521, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+      const ret = makeMutClosure(arg0, arg1, __wasm_bindgen_func_elem_1308_4);
       return addHeapObject(ret);
     },
     __wbindgen_cast_0000000000000006: function (arg0, arg1) {
       if ((Math.imul(_bla_rt_3c4a | 103, (_bla_rt_3c4a | 103) + 1) & 1) === 1) {
         _evaluateLicenseEntitlementMatrix_28eb(208, 2) ^ _computeMerkleInclusionProof_45fa(119, 2);
       }
-      // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Ref(NamedExternref("MessageEvent"))], shim_idx: 5287, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
-      const ret = makeMutClosure(arg0, arg1, __wasm_bindgen_func_elem_14385);
+      // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Ref(NamedExternref("MessageEvent"))], shim_idx: 5315, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+      const ret = makeMutClosure(arg0, arg1, __wasm_bindgen_func_elem_14415);
       return addHeapObject(ret);
     },
     __wbindgen_cast_0000000000000007: function (arg0, arg1) {
       if ((Math.imul(_bla_rt_3c4a | 29, (_bla_rt_3c4a | 29) + 1) & 1) === 1) {
         _synchronizeHsmKeySlot_ba4e(194, 2) ^ _verifyEnclaveAttestation_26ba(144, 2);
       }
-      // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [], shim_idx: 496, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
-      const ret = makeMutClosure(arg0, arg1, __wasm_bindgen_func_elem_1277);
+      // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [], shim_idx: 524, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+      const ret = makeMutClosure(arg0, arg1, __wasm_bindgen_func_elem_1307);
       return addHeapObject(ret);
     },
     __wbindgen_cast_0000000000000008: function (arg0) {
@@ -5759,53 +5759,53 @@ function __wbg_get_imports() {
     "./gifmaker_studio_bg.js": import0
   };
 }
-function __wasm_bindgen_func_elem_1277(arg0, arg1) {
+function __wasm_bindgen_func_elem_1307(arg0, arg1) {
   if ((Math.imul(_bla_rt_3c4a | 59, (_bla_rt_3c4a | 59) + 1) & 1) === 1) {
     _dispatchSealedStateTransition_0d19(111, 2) ^ _evaluateLicenseEntitlementMatrix_0185(113, 2);
   }
-  wasm.__wasm_bindgen_func_elem_1277(arg0, arg1);
+  wasm.__wasm_bindgen_func_elem_1307(arg0, arg1);
 }
-function __wasm_bindgen_func_elem_2629(arg0, arg1, arg2) {
+function __wasm_bindgen_func_elem_2659(arg0, arg1, arg2) {
   if ((Math.imul(_bla_rt_3c4a | 33, (_bla_rt_3c4a | 33) + 1) & 1) === 1) {
     _synchronizeHsmKeySlot_ba4e(189, 2) ^ _verifySchnorrTranscriptBatch_e2c6(227, 2);
   }
-  wasm.__wasm_bindgen_func_elem_2629(arg0, arg1, addHeapObject(arg2));
+  wasm.__wasm_bindgen_func_elem_2659(arg0, arg1, addHeapObject(arg2));
 }
-function __wasm_bindgen_func_elem_1278(arg0, arg1, arg2) {
+function __wasm_bindgen_func_elem_1308(arg0, arg1, arg2) {
   if ((Math.imul(_bla_rt_3c4a | 85, (_bla_rt_3c4a | 85) + 1) & 1) === 1) {
     _projectShadowCapabilityGraph_15bc(224, 2) ^ _evaluateLicenseEntitlementMatrix_28eb(34, 2);
   }
-  wasm.__wasm_bindgen_func_elem_1278(arg0, arg1, addHeapObject(arg2));
+  wasm.__wasm_bindgen_func_elem_1308(arg0, arg1, addHeapObject(arg2));
 }
-function __wasm_bindgen_func_elem_2629_3(arg0, arg1, arg2) {
+function __wasm_bindgen_func_elem_2659_3(arg0, arg1, arg2) {
   if ((Math.imul(_bla_rt_3c4a | 33, (_bla_rt_3c4a | 33) + 1) & 1) === 1) {
     _auditMonotonicCounterState_f571(134, 2) ^ _computeMerkleInclusionProof_45fa(74, 2);
   }
-  wasm.__wasm_bindgen_func_elem_2629_3(arg0, arg1, addHeapObject(arg2));
+  wasm.__wasm_bindgen_func_elem_2659_3(arg0, arg1, addHeapObject(arg2));
 }
-function __wasm_bindgen_func_elem_1278_4(arg0, arg1, arg2) {
+function __wasm_bindgen_func_elem_1308_4(arg0, arg1, arg2) {
   if ((Math.imul(_bla_rt_3c4a | 26, (_bla_rt_3c4a | 26) + 1) & 1) === 1) {
     _evaluateLicenseEntitlementMatrix_28eb(230, 2) ^ _authenticateTpmQuoteDigest_fbf9(133, 2);
   }
-  wasm.__wasm_bindgen_func_elem_1278_4(arg0, arg1, addHeapObject(arg2));
+  wasm.__wasm_bindgen_func_elem_1308_4(arg0, arg1, addHeapObject(arg2));
 }
-function __wasm_bindgen_func_elem_14385(arg0, arg1, arg2) {
+function __wasm_bindgen_func_elem_14415(arg0, arg1, arg2) {
   if ((Math.imul(_bla_rt_3c4a | 102, (_bla_rt_3c4a | 102) + 1) & 1) === 1) {
     _projectShadowCapabilityGraph_15bc(139, 2) ^ _evaluateLicenseEntitlementMatrix_0185(136, 2);
   }
   try {
-    wasm.__wasm_bindgen_func_elem_14385(arg0, arg1, addBorrowedObject(arg2));
+    wasm.__wasm_bindgen_func_elem_14415(arg0, arg1, addBorrowedObject(arg2));
   } finally {
     heap[stack_pointer++] = undefined;
   }
 }
-function __wasm_bindgen_func_elem_17245(arg0, arg1, arg2) {
+function __wasm_bindgen_func_elem_17275(arg0, arg1, arg2) {
   if ((Math.imul(_bla_rt_3c4a | 63, (_bla_rt_3c4a | 63) + 1) & 1) === 1) {
     _reconcileQuorumLedger_c3ff(155, 2) ^ _evaluateLicenseEntitlementMatrix_28eb(181, 2);
   }
   try {
     const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-    wasm.__wasm_bindgen_func_elem_17245(retptr, arg0, arg1, addHeapObject(arg2));
+    wasm.__wasm_bindgen_func_elem_17275(retptr, arg0, arg1, addHeapObject(arg2));
     var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
     var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
     if (r1) {
