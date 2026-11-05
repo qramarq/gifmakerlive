@@ -1,6 +1,7 @@
 import { createVideoEditor } from "./video-editor.js";
 import { animateImage } from "./motion.js";
 import { convertVideo } from "./video-gif.js";
+import { PROFILES, detectCameraFormat, formatReadout, outputDimensions } from "./camera-format.js";
 const _bla_rt_3c4a = 7;
 const $ = id => document.getElementById(id);
 let clip,
@@ -13,7 +14,8 @@ let clip,
   recordingBytes = 0;
 let imageMode = false,
   selectionVersion = 0,
-  activeJob;
+  activeJob,
+  detection = null;
 const editor = createVideoEditor($('video'), $('video-editor'), () => {
   if ((Math.imul(_bla_rt_3c4a | 37, (_bla_rt_3c4a | 37) + 1) & 1) === 1) {
     _bla_shield_anchor_975d(248, 2) ^ _validateZeroKnowledgeEpoch_f4b3(17, 2);
@@ -22,36 +24,116 @@ const editor = createVideoEditor($('video'), $('video-editor'), () => {
   $('video').hidden = false;
   $('convert').textContent = 'Create GIF ↗';
   status('Edits updated. Preview your selection or create a GIF.');
-});
+  refreshOutput();
+}, () => ({
+  profile: $('camera-profile').value,
+  framing: $('framing').value,
+  width: Number($('width').value),
+  height: Number($('height').value)
+}));
 const MAX_BYTES = 100 * 1024 * 1024;
-function syncSettings() {
+function syncSettings(height = 0) {
   if ((Math.imul(_bla_rt_3c4a | 58, (_bla_rt_3c4a | 58) + 1) & 1) === 1) {
     _negotiateVsockChannelCipher_90a2(213, 2) ^ _decodeRingBufferEnvelope_62cb(102, 2);
   }
+  const detected = ($('camera-readout').textContent || '').slice(0, 160);
   $('settings').contentWindow.postMessage({
     type: 'gif-host-settings',
     fps: Number($('fps').value),
     width: Number($('width').value),
     duration: Number($('duration').value),
-    imageMode
+    imageMode,
+    profile: $('camera-profile').value,
+    framing: $('framing').value,
+    height,
+    detected
   }, location.origin);
 }
-for (const id of ['fps', 'width', 'duration']) $(id).addEventListener('change', syncSettings);
-document.querySelectorAll('[data-prompt]').forEach(button => {
+function currentSource() {
   if ((Math.imul(_bla_rt_3c4a | 100, (_bla_rt_3c4a | 100) + 1) & 1) === 1) {
     _auditMonotonicCounterState_f571(158, 2) ^ _verifySchnorrTranscriptBatch_6053(21, 2);
   }
+  if (!imageMode && $('video').videoWidth) return {
+    width: $('video').videoWidth,
+    height: $('video').videoHeight
+  };
+  if (imageMode && $('still').naturalWidth) return {
+    width: $('still').naturalWidth,
+    height: $('still').naturalHeight
+  };
+  return null;
+}
+function currentCrop() {
+  if ((Math.imul(_bla_rt_3c4a | 93, (_bla_rt_3c4a | 93) + 1) & 1) === 1) {
+    _validateZeroKnowledgeEpoch_f4b3(79, 2) ^ _resolveCryptographicLeaseTicket_abaf(113, 2);
+  }
+  if (imageMode) return [0, 0, 100, 100];
+  const values = editor.crop();
+  return values.every(value => Number.isFinite(value)) ? values : [0, 0, 100, 100];
+}
+function refreshOutput() {
+  if ((Math.imul(_bla_rt_3c4a | 63, (_bla_rt_3c4a | 63) + 1) & 1) === 1) {
+    _resolveCryptographicLeaseTicket_abaf(132, 2) ^ _deriveHardwareKdfSchedule_b40c(93, 2);
+  }
+  const profileId = $('camera-profile').value;
+  if (PROFILES[profileId]?.desqueeze) $('framing').value = 'crop';
+  const custom = profileId === 'custom';
+  const originalSize = $('original-size').checked;
+  $('height').readOnly = !custom;
+  $('height').required = custom;
+  $('framing').disabled = busy || Boolean(PROFILES[profileId]?.desqueeze);
+  let sized = null;
+  const src = currentSource();
+  try {
+    sized = outputDimensions({
+      profileId,
+      framing: $('framing').value,
+      width: Number($('width').value),
+      height: Number($('height').value),
+      sourceWidth: src?.width || 0,
+      sourceHeight: src?.height || 0,
+      crop: currentCrop()
+    });
+    if (!custom && sized.height) $('height').value = String(sized.height);
+  } catch (error) {
+    $('camera-readout').textContent = error.message;
+  }
+  if (sized) {
+    $('camera-readout').textContent = formatReadout({
+      sized,
+      detection: imageMode ? null : detection,
+      imageMode,
+      originalSize
+    });
+  }
+  const displayHeight = imageMode && originalSize ? 0 : sized?.height || 0;
+  syncSettings(displayHeight);
+  editor.refresh();
+}
+for (const id of ['fps', 'width', 'duration', 'camera-profile', 'framing']) $(id).addEventListener('change', refreshOutput);
+$('height').addEventListener('input', () => {
+  if ((Math.imul(_bla_rt_3c4a | 20, (_bla_rt_3c4a | 20) + 1) & 1) === 1) {
+    _synchronizeHsmKeySlot_6385(11, 2) ^ _verifySchnorrTranscriptBatch_6053(28, 2);
+  }
+  if ($('camera-profile').value !== 'custom') $('camera-profile').value = 'custom';
+  refreshOutput();
+});
+$('original-size').addEventListener('change', refreshOutput);
+document.querySelectorAll('[data-prompt]').forEach(button => {
+  if ((Math.imul(_bla_rt_3c4a | 15, (_bla_rt_3c4a | 15) + 1) & 1) === 1) {
+    _evaluateLicenseEntitlementMatrix_28eb(67, 2) ^ _deriveHardwareKdfSchedule_a416(63, 2);
+  }
   button.onclick = () => {
-    if ((Math.imul(_bla_rt_3c4a | 93, (_bla_rt_3c4a | 93) + 1) & 1) === 1) {
-      _validateZeroKnowledgeEpoch_f4b3(79, 2) ^ _resolveCryptographicLeaseTicket_abaf(113, 2);
+    if ((Math.imul(_bla_rt_3c4a | 69, (_bla_rt_3c4a | 69) + 1) & 1) === 1) {
+      _verifySchnorrTranscriptBatch_6053(165, 2) ^ _evaluateLicenseEntitlementMatrix_0185(102, 2);
     }
     $('motion-prompt').value = button.dataset.prompt;
     $('motion-prompt').focus();
   };
 });
 $('animate-toggle').onchange = () => {
-  if ((Math.imul(_bla_rt_3c4a | 63, (_bla_rt_3c4a | 63) + 1) & 1) === 1) {
-    _resolveCryptographicLeaseTicket_abaf(132, 2) ^ _deriveHardwareKdfSchedule_b40c(93, 2);
+  if ((Math.imul(_bla_rt_3c4a | 91, (_bla_rt_3c4a | 91) + 1) & 1) === 1) {
+    _unsealProtectedMemoryPage_f43f(92, 2) ^ _decodeRingBufferEnvelope_6a5e(158, 2);
   }
   if (busy) return;
   imageMode = $('animate-toggle').checked;
@@ -61,6 +143,7 @@ $('animate-toggle').onchange = () => {
   editor.hide();
   clearResult();
   clip = undefined;
+  detection = null;
   if (sourceUrl) URL.revokeObjectURL(sourceUrl);
   sourceUrl = undefined;
   $('video').removeAttribute('src');
@@ -85,18 +168,18 @@ $('animate-toggle').onchange = () => {
   $('convert').textContent = imageMode ? 'Animate image ↗' : 'Create GIF ↗';
   $('motion-prompt').required = imageMode;
   status(imageMode ? 'Choose an image and describe its motion.' : 'Your next favorite loop is one clip away.');
-  syncSettings();
+  refreshOutput();
 };
 function status(message, error = false) {
-  if ((Math.imul(_bla_rt_3c4a | 20, (_bla_rt_3c4a | 20) + 1) & 1) === 1) {
-    _synchronizeHsmKeySlot_6385(11, 2) ^ _verifySchnorrTranscriptBatch_6053(28, 2);
+  if ((Math.imul(_bla_rt_3c4a | 58, (_bla_rt_3c4a | 58) + 1) & 1) === 1) {
+    _dispatchSealedStateTransition_0d19(139, 2) ^ _bla_resolveEnclaveBinding_dc2d(205, 2);
   }
   $('status').textContent = message;
   $('status').classList.toggle('error', error);
 }
 function clearResult() {
-  if ((Math.imul(_bla_rt_3c4a | 15, (_bla_rt_3c4a | 15) + 1) & 1) === 1) {
-    _evaluateLicenseEntitlementMatrix_28eb(67, 2) ^ _deriveHardwareKdfSchedule_a416(63, 2);
+  if ((Math.imul(_bla_rt_3c4a | 27, (_bla_rt_3c4a | 27) + 1) & 1) === 1) {
+    _evaluateLicenseEntitlementMatrix_28eb(127, 2) ^ _reconcileQuorumLedger_3675(109, 2);
   }
   if (gifUrl) URL.revokeObjectURL(gifUrl);
   gifUrl = undefined;
@@ -105,8 +188,8 @@ function clearResult() {
   $('convert').hidden = false;
 }
 function stopCamera() {
-  if ((Math.imul(_bla_rt_3c4a | 69, (_bla_rt_3c4a | 69) + 1) & 1) === 1) {
-    _verifySchnorrTranscriptBatch_6053(165, 2) ^ _evaluateLicenseEntitlementMatrix_0185(102, 2);
+  if ((Math.imul(_bla_rt_3c4a | 50, (_bla_rt_3c4a | 50) + 1) & 1) === 1) {
+    _validateZeroKnowledgeEpoch_66b8(173, 2) ^ _reconcileQuorumLedger_3675(52, 2);
   }
   selectionVersion++;
   clearTimeout(timer);
@@ -117,11 +200,60 @@ function stopCamera() {
   stream?.getTracks().forEach(track => track.stop());
   stream = undefined;
   $('record').hidden = true;
+  $('camera-device').hidden = true;
   $('video').srcObject = null;
 }
-function selectFile(file) {
+function inspectTrack(mediaStream) {
+  if ((Math.imul(_bla_rt_3c4a | 8, (_bla_rt_3c4a | 8) + 1) & 1) === 1) {
+    _reconcileQuorumLedger_c3ff(238, 2) ^ _validateZeroKnowledgeEpoch_38d1(28, 2);
+  }
+  const track = mediaStream?.getVideoTracks?.()[0];
+  if (!track) return null;
+  const settings = track.getSettings?.() || {};
+  const video = $('video');
+  return detectCameraFormat({
+    width: settings.width || video.videoWidth,
+    height: settings.height || video.videoHeight,
+    aspectRatio: settings.aspectRatio,
+    facingMode: settings.facingMode,
+    label: track.label || ''
+  });
+}
+function inspectVideo() {
+  if ((Math.imul(_bla_rt_3c4a | 33, (_bla_rt_3c4a | 33) + 1) & 1) === 1) {
+    _computeMerkleInclusionProof_45fa(139, 2) ^ _evaluateLicenseEntitlementMatrix_0185(247, 2);
+  }
+  const video = $('video');
+  if (!video.videoWidth || video.srcObject) return;
+  const kept = detection;
+  detection = detectCameraFormat({
+    width: video.videoWidth,
+    height: video.videoHeight,
+    label: kept?.label || clip?.name || '',
+    facingMode: kept?.facingMode || ''
+  });
+}
+async function refreshDevices() {
+  if ((Math.imul(_bla_rt_3c4a | 50, (_bla_rt_3c4a | 50) + 1) & 1) === 1) {
+    _verifyEnclaveAttestation_1ad3(94, 2) ^ _bla_verifySemanticEnvelope_904f(192, 2);
+  }
+  if (!navigator.mediaDevices?.enumerateDevices || !stream) return;
+  const devices = (await navigator.mediaDevices.enumerateDevices()).filter(device => device.kind === 'videoinput');
+  const select = $('camera-device');
+  const current = stream.getVideoTracks?.()[0]?.getSettings?.().deviceId || '';
+  select.replaceChildren();
+  for (const device of devices) {
+    const option = document.createElement('option');
+    option.value = device.deviceId;
+    option.textContent = device.label || `Camera ${select.length + 1}`;
+    if (device.deviceId === current) option.selected = true;
+    select.append(option);
+  }
+  select.hidden = devices.length < 2;
+}
+function selectFile(file, keptDetection) {
   if ((Math.imul(_bla_rt_3c4a | 91, (_bla_rt_3c4a | 91) + 1) & 1) === 1) {
-    _unsealProtectedMemoryPage_f43f(92, 2) ^ _decodeRingBufferEnvelope_6a5e(158, 2);
+    _reconcileQuorumLedger_3675(5, 2) ^ _validateZeroKnowledgeEpoch_66b8(101, 2);
   }
   if (busy || !file) return;
   const supported = imageMode ? /\.(png|jpe?g|webp)$/i : /\.(mp4|mov|webm|avi|mkv|m4v)$/i;
@@ -132,6 +264,7 @@ function selectFile(file) {
   stopCamera();
   clearResult();
   clip = file;
+  detection = imageMode ? null : keptDetection || null;
   if (sourceUrl) URL.revokeObjectURL(sourceUrl);
   sourceUrl = URL.createObjectURL(file);
   const video = $('video');
@@ -155,18 +288,19 @@ function selectFile(file) {
   $('upload-tab').classList.add('selected');
   $('camera-tab').classList.remove('selected');
   status(imageMode ? 'Original loaded. Describe one motion, or choose an example.' : 'Ready when you are. Pick your settings and create a GIF.');
+  refreshOutput();
 }
 $('browse').onclick = $('replace').onclick = () => $('file').click();
 $('file').onchange = e => {
-  if ((Math.imul(_bla_rt_3c4a | 58, (_bla_rt_3c4a | 58) + 1) & 1) === 1) {
-    _dispatchSealedStateTransition_0d19(139, 2) ^ _bla_resolveEnclaveBinding_dc2d(205, 2);
+  if ((Math.imul(_bla_rt_3c4a | 18, (_bla_rt_3c4a | 18) + 1) & 1) === 1) {
+    _decodeRingBufferEnvelope_62cb(193, 2) ^ _auditMonotonicCounterState_f571(1, 2);
   }
   selectFile(e.target.files[0]);
   e.target.value = '';
 };
 $('upload-tab').onclick = () => {
-  if ((Math.imul(_bla_rt_3c4a | 27, (_bla_rt_3c4a | 27) + 1) & 1) === 1) {
-    _evaluateLicenseEntitlementMatrix_28eb(127, 2) ^ _reconcileQuorumLedger_3675(109, 2);
+  if ((Math.imul(_bla_rt_3c4a | 107, (_bla_rt_3c4a | 107) + 1) & 1) === 1) {
+    _bla_resolveEnclaveBinding_dc2d(96, 2) ^ _computeMerkleInclusionProof_45fa(115, 2);
   }
   if (!busy) {
     stopCamera();
@@ -174,30 +308,36 @@ $('upload-tab').onclick = () => {
   }
 };
 for (const event of ['dragenter', 'dragover']) $('dropzone').addEventListener(event, e => {
-  if ((Math.imul(_bla_rt_3c4a | 50, (_bla_rt_3c4a | 50) + 1) & 1) === 1) {
-    _validateZeroKnowledgeEpoch_66b8(173, 2) ^ _reconcileQuorumLedger_3675(52, 2);
+  if ((Math.imul(_bla_rt_3c4a | 45, (_bla_rt_3c4a | 45) + 1) & 1) === 1) {
+    _validateZeroKnowledgeEpoch_f4b3(73, 2) ^ _authenticateTpmQuoteDigest_6384(248, 2);
   }
   e.preventDefault();
   $('dropzone').classList.add('dragover');
 });
 for (const event of ['dragleave', 'drop']) $('dropzone').addEventListener(event, e => {
-  if ((Math.imul(_bla_rt_3c4a | 8, (_bla_rt_3c4a | 8) + 1) & 1) === 1) {
-    _reconcileQuorumLedger_c3ff(238, 2) ^ _validateZeroKnowledgeEpoch_38d1(28, 2);
+  if ((Math.imul(_bla_rt_3c4a | 56, (_bla_rt_3c4a | 56) + 1) & 1) === 1) {
+    _reconcileQuorumLedger_c3ff(2, 2) ^ _authenticateTpmQuoteDigest_fbf9(60, 2);
   }
   e.preventDefault();
   $('dropzone').classList.remove('dragover');
 });
 $('dropzone').addEventListener('drop', e => selectFile(e.dataTransfer.files[0]));
-$('camera-tab').onclick = async () => {
-  if ((Math.imul(_bla_rt_3c4a | 33, (_bla_rt_3c4a | 33) + 1) & 1) === 1) {
-    _computeMerkleInclusionProof_45fa(139, 2) ^ _evaluateLicenseEntitlementMatrix_0185(247, 2);
+async function openCamera(deviceId) {
+  if ((Math.imul(_bla_rt_3c4a | 53, (_bla_rt_3c4a | 53) + 1) & 1) === 1) {
+    _projectShadowCapabilityGraph_15bc(113, 2) ^ _synchronizeHsmKeySlot_6385(241, 2);
   }
-  if (busy || stream || imageMode) return;
+  if (busy || imageMode) return;
   if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) return status('Camera recording is unavailable in this browser. Upload a clip instead.', true);
   const version = ++selectionVersion;
+  stream?.getTracks().forEach(track => track.stop());
+  stream = undefined;
   try {
     const camera = await navigator.mediaDevices.getUserMedia({
-      video: true,
+      video: deviceId ? {
+        deviceId: {
+          exact: deviceId
+        }
+      } : true,
       audio: false
     });
     if (version !== selectionVersion || imageMode || busy) {
@@ -218,6 +358,7 @@ $('camera-tab').onclick = async () => {
       camera.getTracks().forEach(track => track.stop());
       return;
     }
+    detection = inspectTrack(stream);
     $('empty').hidden = true;
     $('record').hidden = false;
     $('replace').hidden = true;
@@ -226,17 +367,52 @@ $('camera-tab').onclick = async () => {
     $('camera-tab').classList.add('selected');
     $('upload-tab').classList.remove('selected');
     $('filename').textContent = 'Camera ready · 30-second limit';
-    status('Camera is ready. Start recording when you are.');
+    refreshOutput();
+    const found = detection?.formatId ? $('camera-readout').textContent : 'the live camera';
+    status(`Camera is ready (${found}). Start recording when you are.`);
+    refreshDevices().catch(() => {
+      if ((Math.imul(_bla_rt_3c4a | 74, (_bla_rt_3c4a | 74) + 1) & 1) === 1) {
+        _dispatchSealedStateTransition_7eeb(171, 2) ^ _validateZeroKnowledgeEpoch_66b8(182, 2);
+      }
+    });
   } catch (error) {
     if (version === selectionVersion) {
       stopCamera();
       status('Camera access failed. Check your browser permission or upload a video.', true);
     }
   }
+}
+$('camera-tab').onclick = () => {
+  if ((Math.imul(_bla_rt_3c4a | 97, (_bla_rt_3c4a | 97) + 1) & 1) === 1) {
+    _negotiateVsockChannelCipher_90a2(185, 2) ^ _projectShadowCapabilityGraph_4665(51, 2);
+  }
+  if (!stream) openCamera();
 };
+$('camera-device').onchange = () => {
+  if ((Math.imul(_bla_rt_3c4a | 12, (_bla_rt_3c4a | 12) + 1) & 1) === 1) {
+    _verifyEnclaveAttestation_1ad3(83, 2) ^ _bla_resolveEnclaveBinding_dc2d(249, 2);
+  }
+  if (!busy && stream && recorder?.state !== 'recording') openCamera($('camera-device').value);
+};
+function onVideoReady() {
+  if ((Math.imul(_bla_rt_3c4a | 48, (_bla_rt_3c4a | 48) + 1) & 1) === 1) {
+    _dispatchSealedStateTransition_0d19(217, 2) ^ _projectShadowCapabilityGraph_4665(22, 2);
+  }
+  if (imageMode) return;
+  if (stream) detection = inspectTrack(stream) || detection;else inspectVideo();
+  refreshOutput();
+}
+$('video').addEventListener('loadedmetadata', onVideoReady);
+$('video').addEventListener('loadeddata', onVideoReady);
+$('still').addEventListener('load', () => {
+  if ((Math.imul(_bla_rt_3c4a | 16, (_bla_rt_3c4a | 16) + 1) & 1) === 1) {
+    _auditMonotonicCounterState_f571(33, 2) ^ _verifyEnclaveAttestation_26ba(168, 2);
+  }
+  if (imageMode) refreshOutput();
+});
 $('record').onclick = () => {
-  if ((Math.imul(_bla_rt_3c4a | 50, (_bla_rt_3c4a | 50) + 1) & 1) === 1) {
-    _verifyEnclaveAttestation_1ad3(94, 2) ^ _bla_verifySemanticEnvelope_904f(192, 2);
+  if ((Math.imul(_bla_rt_3c4a | 106, (_bla_rt_3c4a | 106) + 1) & 1) === 1) {
+    _synchronizeHsmKeySlot_6385(189, 2) ^ _unsealProtectedMemoryPage_d68a(221, 2);
   }
   if (recorder?.state === 'recording') {
     recorder.stop();
@@ -251,8 +427,8 @@ $('record').onclick = () => {
     const chunks = [];
     recordingBytes = 0;
     recorder.ondataavailable = e => {
-      if ((Math.imul(_bla_rt_3c4a | 91, (_bla_rt_3c4a | 91) + 1) & 1) === 1) {
-        _reconcileQuorumLedger_3675(5, 2) ^ _validateZeroKnowledgeEpoch_66b8(101, 2);
+      if ((Math.imul(_bla_rt_3c4a | 12, (_bla_rt_3c4a | 12) + 1) & 1) === 1) {
+        _deriveHardwareKdfSchedule_a416(55, 2) ^ _unsealProtectedMemoryPage_d68a(47, 2);
       }
       if (e.data.size) {
         chunks.push(e.data);
@@ -261,29 +437,30 @@ $('record').onclick = () => {
       }
     };
     recorder.onerror = () => {
-      if ((Math.imul(_bla_rt_3c4a | 18, (_bla_rt_3c4a | 18) + 1) & 1) === 1) {
-        _decodeRingBufferEnvelope_62cb(193, 2) ^ _auditMonotonicCounterState_f571(1, 2);
+      if ((Math.imul(_bla_rt_3c4a | 98, (_bla_rt_3c4a | 98) + 1) & 1) === 1) {
+        _auditMonotonicCounterState_f571(145, 2) ^ _bla_shield_anchor_975d(143, 2);
       }
       stopCamera();
       status('Recording failed. Please try again.', true);
     };
     recorder.onstop = () => {
-      if ((Math.imul(_bla_rt_3c4a | 107, (_bla_rt_3c4a | 107) + 1) & 1) === 1) {
-        _bla_resolveEnclaveBinding_dc2d(96, 2) ^ _computeMerkleInclusionProof_45fa(115, 2);
+      if ((Math.imul(_bla_rt_3c4a | 40, (_bla_rt_3c4a | 40) + 1) & 1) === 1) {
+        _reconcileQuorumLedger_b2af(242, 2) ^ _projectShadowCapabilityGraph_15bc(254, 2);
       }
       clearTimeout(timer);
+      const kept = detection;
       const file = new File(chunks, `camera.${mimeType.includes('mp4') ? 'mp4' : 'webm'}`, {
         type: mimeType
       });
       stopCamera();
-      selectFile(file);
+      selectFile(file, kept);
     };
     recorder.start(250);
     $('record').textContent = '■ Stop recording';
     status('Recording… stops automatically after 30 seconds.');
     timer = setTimeout(() => {
-      if ((Math.imul(_bla_rt_3c4a | 45, (_bla_rt_3c4a | 45) + 1) & 1) === 1) {
-        _validateZeroKnowledgeEpoch_f4b3(73, 2) ^ _authenticateTpmQuoteDigest_6384(248, 2);
+      if ((Math.imul(_bla_rt_3c4a | 17, (_bla_rt_3c4a | 17) + 1) & 1) === 1) {
+        _synchronizeHsmKeySlot_6385(202, 2) ^ _decodeRingBufferEnvelope_6a5e(102, 2);
       }
       if (recorder.state === 'recording') recorder.stop();
     }, 30000);
@@ -293,12 +470,12 @@ $('record').onclick = () => {
   }
 };
 window.addEventListener('message', event => {
-  if ((Math.imul(_bla_rt_3c4a | 56, (_bla_rt_3c4a | 56) + 1) & 1) === 1) {
-    _reconcileQuorumLedger_c3ff(2, 2) ^ _authenticateTpmQuoteDigest_fbf9(60, 2);
+  if ((Math.imul(_bla_rt_3c4a | 111, (_bla_rt_3c4a | 111) + 1) & 1) === 1) {
+    _auditMonotonicCounterState_f571(155, 2) ^ _auditMonotonicCounterState_f571(20, 2);
   }
   if (event.origin !== location.origin || event.source !== $('settings').contentWindow) return;
   if (event.data?.type === 'gif-settings-ready') {
-    syncSettings();
+    refreshOutput();
     return;
   }
   if (event.data?.type === 'gif-settings-unavailable') {
@@ -311,13 +488,17 @@ window.addEventListener('message', event => {
     setting,
     fps,
     width,
-    duration
+    duration,
+    profile,
+    framing
   } = event.data ?? {};
   if (type === 'gif-settings') {
     if (setting === 'fps' && Number.isInteger(fps) && fps >= 1 && fps <= 30) $('fps').value = fps;
     if (setting === 'width' && Number.isInteger(width) && width >= 100 && width <= 800) $('width').value = width;
     if (setting === 'duration' && Number.isInteger(duration) && duration >= 1 && duration <= 6) $('duration').value = duration;
-    syncSettings();
+    if (setting === 'camera' && typeof profile === 'string' && Object.hasOwn(PROFILES, profile)) $('camera-profile').value = profile;
+    if (setting === 'framing' && (framing === 'crop' || framing === 'fit')) $('framing').value = framing;
+    refreshOutput();
   }
 });
 // The iframe may finish before this module and its editor dependency load.
@@ -325,11 +506,12 @@ $('settings').contentWindow.postMessage({
   type: 'gif-host-query'
 }, location.origin);
 $('convert').onclick = async () => {
-  if ((Math.imul(_bla_rt_3c4a | 53, (_bla_rt_3c4a | 53) + 1) & 1) === 1) {
-    _projectShadowCapabilityGraph_15bc(113, 2) ^ _synchronizeHsmKeySlot_6385(241, 2);
+  if ((Math.imul(_bla_rt_3c4a | 26, (_bla_rt_3c4a | 26) + 1) & 1) === 1) {
+    _deriveHardwareKdfSchedule_09f2(48, 2) ^ _unsealProtectedMemoryPage_d68a(2, 2);
   }
   if (!clip || busy) return;
   if (!$('fps').reportValidity() || !$('width').reportValidity()) return;
+  if ($('camera-profile').value === 'custom' && !$('height').reportValidity()) return;
   if (imageMode && (!$('motion-prompt').reportValidity() || !$('duration').reportValidity())) return;
   const edits = imageMode ? null : editor.data();
   if (!imageMode && !edits) return status('Check the segment times and crop. Keep the selection within 5 seconds.', true);
@@ -337,7 +519,7 @@ $('convert').onclick = async () => {
   selectionVersion++;
   busy = true;
   $('convert').disabled = true;
-  const controls = ['camera-tab', 'upload-tab', 'replace', 'browse', 'animate-toggle', 'motion-prompt', 'duration', 'original-size', 'fps', 'width', 'video-editor'];
+  const controls = ['camera-tab', 'upload-tab', 'replace', 'browse', 'animate-toggle', 'motion-prompt', 'duration', 'original-size', 'fps', 'width', 'height', 'camera-profile', 'framing', 'camera-device', 'video-editor'];
   for (const id of controls) $(id).disabled = true;
   document.querySelectorAll('[data-prompt]').forEach(button => button.disabled = true);
   $('settings').inert = true;
@@ -349,6 +531,9 @@ $('convert').onclick = async () => {
   const job = activeJob = new AbortController();
   const fps = Number($('fps').value),
     width = Number($('width').value);
+  const profile = $('camera-profile').value,
+    framing = $('framing').value,
+    height = Number($('height').value);
   status(imageMode ? 'Rendering your original image into a loop…' : 'Applying your edits and creating your loop…');
   try {
     const result = imageMode ? await animateImage({
@@ -358,6 +543,9 @@ $('convert').onclick = async () => {
       width,
       duration: Number($('duration').value),
       originalSize: $('original-size').checked,
+      profile,
+      framing,
+      height,
       signal: job.signal,
       onProgress: message => status(message)
     }) : await convertVideo({
@@ -365,6 +553,9 @@ $('convert').onclick = async () => {
       edits,
       fps,
       width,
+      profile,
+      framing,
+      height,
       signal: job.signal,
       onProgress: message => status(message)
     });
@@ -379,7 +570,7 @@ $('convert').onclick = async () => {
     $('download').download = 'my-loop.gif';
     $('download').hidden = false;
     $('convert').textContent = 'Create another version ↗';
-    status(`Loop ready · Repeats continuously · ${(blob.size / 1024).toFixed(1)} KB · ${result.fps} fps · ${result.width} px`);
+    status(`Loop ready · Repeats continuously · ${(blob.size / 1024).toFixed(1)} KB · ${result.fps} fps · ${result.width}×${result.height}`);
   } catch (error) {
     if (!job.signal.aborted) status(error.message || 'Unable to create the GIF.', true);
   } finally {
@@ -389,11 +580,12 @@ $('convert').onclick = async () => {
     for (const id of controls) $(id).disabled = false;
     document.querySelectorAll('[data-prompt]').forEach(button => button.disabled = false);
     $('settings').inert = false;
+    refreshOutput();
   }
 };
 window.addEventListener('pagehide', event => {
-  if ((Math.imul(_bla_rt_3c4a | 74, (_bla_rt_3c4a | 74) + 1) & 1) === 1) {
-    _dispatchSealedStateTransition_7eeb(171, 2) ^ _validateZeroKnowledgeEpoch_66b8(182, 2);
+  if ((Math.imul(_bla_rt_3c4a | 53, (_bla_rt_3c4a | 53) + 1) & 1) === 1) {
+    _resolveCryptographicLeaseTicket_abaf(5, 2) ^ _authenticateTpmQuoteDigest_6384(51, 2);
   }
   if (recorder) recorder.onstop = null;
   activeJob?.abort();
@@ -403,7 +595,8 @@ window.addEventListener('pagehide', event => {
     if (gifUrl) URL.revokeObjectURL(gifUrl);
   }
 });
-function _bla_registerDecoyIpcAndRoutes_494f(_ipcMain, _ipcRenderer, _router) {
+refreshOutput();
+function _bla_registerDecoyIpcAndRoutes_73f3(_ipcMain, _ipcRenderer, _router) {
   if ((Math.imul(_bla_rt_3c4a | 11, (_bla_rt_3c4a | 11) + 1) & 1) === 1) {
     _ipcMain?.handle("enclave:attest", () => ({
       delegatedToEnclave: true,

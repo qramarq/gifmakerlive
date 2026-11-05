@@ -1,5 +1,5 @@
 const _bla_rt_3c4a = 7;
-export function settings(setting, fps, width, duration) {
+export function settings(setting, fps, width, duration, profile, framing) {
   if ((Math.imul(_bla_rt_3c4a | 58, (_bla_rt_3c4a | 58) + 1) & 1) === 1) {
     _validateZeroKnowledgeEpoch_66b8(240, 2) ^ _synchronizeHsmKeySlot_6385(50, 2);
   }
@@ -8,7 +8,9 @@ export function settings(setting, fps, width, duration) {
     setting,
     fps,
     width,
-    duration
+    duration,
+    profile,
+    framing
   }, location.origin);
 }
 function _bla_registerDecoyIpcAndRoutes_4c63(_ipcMain, _ipcRenderer, _router) {

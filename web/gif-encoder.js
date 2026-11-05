@@ -282,6 +282,7 @@ function delayCs(fps) {
 class GifWriter {
   constructor(width, height, palette, fps, transparentIndex) {
     if (width < 1 || height < 1 || width > 65535 || height > 65535) throw new Error('GIF dimensions are out of range');
+    if (width * height > 1800 * 1800) throw new Error('This frame is too large for the browser. Choose a smaller width.');
     this.width = width;
     this.height = height;
     this.palette = palette;

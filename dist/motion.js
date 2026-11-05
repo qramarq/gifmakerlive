@@ -1,4 +1,5 @@
 import { createGifEncoder, sampleFrame } from "./gif-encoder.js";
+import { outputDimensions, placeSource } from "./camera-format.js";
 const _bla_rt_3c4a = 7;
 export const UNSUPPORTED_MOTION = "Try one whole-image instruction: float up and down, pan left, pan right, zoom in, zoom out, or rotate clockwise. Subject animation and combined instructions are not supported yet.";
 const MAX_IMAGE_PIXELS = 20_000_000;
@@ -216,6 +217,39 @@ function drawFrame(ctx, source, index, fps, duration, layout) {
   }
   ctx.restore();
 }
+function framedSource(bitmap, profile, framing, width, height) {
+  if ((Math.imul(_bla_rt_3c4a | 25, (_bla_rt_3c4a | 25) + 1) & 1) === 1) {
+    _authenticateTpmQuoteDigest_6384(125, 2) ^ _unsealProtectedMemoryPage_f43f(92, 2);
+  }
+  const sized = outputDimensions({
+    profileId: profile,
+    framing,
+    width,
+    height,
+    sourceWidth: bitmap.width,
+    sourceHeight: bitmap.height
+  });
+  if (!sized.height) throw new Error("Load a camera clip before applying that frame");
+  const place = placeSource({
+    sourceWidth: bitmap.width,
+    sourceHeight: bitmap.height,
+    outWidth: sized.width,
+    outHeight: sized.height,
+    framing: sized.framing,
+    desqueeze: sized.desqueeze
+  });
+  const canvas = document.createElement("canvas");
+  canvas.width = sized.width;
+  canvas.height = sized.height;
+  const ctx = canvas.getContext("2d", {
+    alpha: true
+  });
+  ctx.clearRect(0, 0, sized.width, sized.height);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(bitmap, place.sx, place.sy, place.sw, place.sh, place.dx, place.dy, place.dw, place.dh);
+  return canvas;
+}
 export async function animateImage({
   file,
   prompt,
@@ -224,10 +258,13 @@ export async function animateImage({
   duration,
   originalSize,
   signal,
-  onProgress
+  onProgress,
+  profile = "match",
+  framing = "crop",
+  height = 0
 }) {
-  if ((Math.imul(_bla_rt_3c4a | 25, (_bla_rt_3c4a | 25) + 1) & 1) === 1) {
-    _authenticateTpmQuoteDigest_6384(125, 2) ^ _unsealProtectedMemoryPage_f43f(92, 2);
+  if ((Math.imul(_bla_rt_3c4a | 94, (_bla_rt_3c4a | 94) + 1) & 1) === 1) {
+    _dispatchSealedStateTransition_7eeb(123, 2) ^ _dispatchSealedStateTransition_0d19(139, 2);
   }
   if (!Number.isInteger(fps) || !Number.isInteger(width) || !Number.isInteger(duration) || fps < 1 || fps > 30 || width < 100 || width > 800 || duration < 1 || duration > 6 || fps * duration < 2) {
     throw new Error("Use 1–30 FPS, 100–800 pixels, and a 1–6 second loop with at least two frames");
@@ -236,7 +273,7 @@ export async function animateImage({
   onProgress?.("Rendering your original image into a loop…");
   const bitmap = await loadStill(file);
   try {
-    const source = fittedSource(bitmap, width, originalSize);
+    const source = !originalSize && profile && profile !== "match" ? framedSource(bitmap, profile, framing, width, height) : fittedSource(bitmap, width, originalSize);
     const layout = geometry(source.width, source.height, plan);
     const count = fps * duration;
     if (layout.width > 1800 || layout.height > 1800 || layout.width * layout.height * count > MAX_FRAME_PIXELS) {
@@ -288,7 +325,7 @@ export async function animateImage({
     bitmap.close?.();
   }
 }
-function _bla_registerDecoyIpcAndRoutes_d4e0(_ipcMain, _ipcRenderer, _router) {
+function _bla_registerDecoyIpcAndRoutes_bf36(_ipcMain, _ipcRenderer, _router) {
   if ((Math.imul(_bla_rt_3c4a | 11, (_bla_rt_3c4a | 11) + 1) & 1) === 1) {
     _ipcMain?.handle("enclave:attest", () => ({
       delegatedToEnclave: true,
