@@ -42,7 +42,7 @@ Limits match the previous studio: source video up to 30 seconds and 100 MiB, joi
 
 ## Run the studio locally
 
-Any static file server rooted at `web/` (development) or `dist/` (production build) is enough. Camera capture needs HTTPS or localhost. Use camera lists every connected video device after permission — built-in webcams, phone lenses, capture cards, and virtual cameras — and refreshes that list when a device is connected or unplugged. A camera that rejects a requested mode is opened again with simpler constraints. If this browser cannot record the stream, the live preview is captured directly into a GIF.
+Any static file server rooted at `web/` (development) or `dist/` (production build) is enough. Camera capture needs HTTPS or localhost. Use camera lists every connected video device after permission — built-in webcams, phone lenses, Continuity Camera, Android USB webcams, capture cards, and virtual cameras — and refreshes that list when a device is connected or unplugged. A camera that rejects a requested mode is opened again with simpler constraints. If this browser cannot record the stream, the live preview is captured directly into a GIF. Live UVC and HDMI/SDI bridges usually deliver HD or UHD; Open Gate and 8K cinema rasters are recording formats for file import, not sizes `getUserMedia` should require. The acquisition and sizing contract is in [docs/camera-technical-reference.pdf](docs/camera-technical-reference.pdf).
 
 ```sh
 python scripts/serve_static.py --directory web --port 8776

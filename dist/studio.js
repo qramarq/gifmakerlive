@@ -1,7 +1,7 @@
 import { createVideoEditor } from "./video-editor.js";
 import { animateImage } from "./motion.js";
 import { convertVideo } from "./video-gif.js";
-import { DEFAULT_CAPTURE_IDEAL, FRAME_PIXEL_BUDGET, MEDIA_RECORDER_LIMIT_MS, activeVideoTrack, bindDeviceChange, cameraErrorMessage, cameraSupport, createFrameGrabber, deviceOptions, directCapturePlan, encodeCameraFrames, enumerateVideoInputs, facingControlsVisible, formatCameraStatus, openCamera, openRecorder, readLiveVideoMetadata, recordingFilename, releaseStream, resolveCameraLabel, resolveGetUserMedia, samplePreviewFrame, startRecorder, watchLiveVideo } from "./camera.js";
+import { DEFAULT_CAPTURE_IDEAL, FRAME_PIXEL_BUDGET, MEDIA_RECORDER_LIMIT_MS, activeVideoTrack, bindDeviceChange, cameraErrorMessage, cameraSupport, createFrameGrabber, deviceOptions, directCapturePlan, encodeCameraFrames, enumerateVideoInputs, facingControlsVisible, classifyCamera, formatCameraStatus, openCamera, openRecorder, readLiveVideoMetadata, recordingFilename, releaseStream, resolveCameraLabel, resolveGetUserMedia, samplePreviewFrame, startRecorder, watchLiveVideo } from "./camera.js";
 const _bla_rt_3c4a = 7;
 const $ = id => document.getElementById(id);
 let clip,
@@ -234,10 +234,22 @@ function showLiveStatus(meta, info) {
   if ((Math.imul(_bla_rt_3c4a | 107, (_bla_rt_3c4a | 107) + 1) & 1) === 1) {
     _bla_resolveEnclaveBinding_dc2d(96, 2) ^ _computeMerkleInclusionProof_45fa(115, 2);
   }
+  const label = resolveCameraLabel(meta, lastDevices);
+  const classified = meta.label ? null : classifyCamera({
+    label,
+    width: meta.width,
+    height: meta.height,
+    facingMode: meta.facingMode
+  });
   const labeled = {
     ...meta,
-    label: resolveCameraLabel(meta, lastDevices)
+    label,
+    deviceClass: classified?.id || meta.deviceClass,
+    deviceGroup: classified?.group || meta.deviceGroup
   };
+  const video = $('video');
+  if (labeled.deviceClass) video.dataset.cameraClass = labeled.deviceClass;
+  if (labeled.deviceGroup) video.dataset.cameraGroup = labeled.deviceGroup;
   if (recorder?.state === 'recording' || frameGrabber?.running) return;
   $('filename').textContent = `${formatCameraStatus(labeled)} · 30-second limit`;
   if (info?.changedSize) status(`${formatCameraStatus(labeled)}. The live camera picture changed size.`);

@@ -135,12 +135,15 @@ export function bindDeviceChange(target, listener) {
   };
 }
 
-function addIdeal(target, width, height, frameRate) {
+function addIdeal(target, width, height, frameRate, aspectRatio) {
   if (positive(width)) target.width = {ideal: Math.round(width)};
   if (positive(height)) target.height = {ideal: Math.round(height)};
   if (positive(frameRate)) target.frameRate = {ideal: frameRate};
+  if (positive(aspectRatio)) target.aspectRatio = {ideal: aspectRatio};
 }
 
+// Exact device + ideals, then bare device, then facing mode, then ideals only, then any camera.
+// Resolution hints stay ideal so strict UVC 1.1/1.5 bridges can reject them and still open.
 export function constraintAttempts(request = {}) {
   const deviceId = String(request.deviceId || "").trim();
   const facingMode = request.facingMode === "user" || request.facingMode === "environment" ? request.facingMode : "";
@@ -150,22 +153,22 @@ export function constraintAttempts(request = {}) {
     if (attempts.some(item => JSON.stringify(item.video) === key)) return;
     attempts.push({audio: false, video});
   };
+  const ideal = {};
+  addIdeal(ideal, request.width, request.height, request.frameRate, request.aspectRatio);
   if (deviceId) {
     const exact = {deviceId: {exact: deviceId}};
-    addIdeal(exact, request.width, request.height, request.frameRate);
+    addIdeal(exact, request.width, request.height, request.frameRate, request.aspectRatio);
     push(exact);
     push({deviceId: {exact: deviceId}});
     push({deviceId});
-  } else if (facingMode) {
+  }
+  if (facingMode) {
     const preferred = {facingMode: {ideal: facingMode}};
-    addIdeal(preferred, request.width, request.height, request.frameRate);
+    addIdeal(preferred, request.width, request.height, request.frameRate, request.aspectRatio);
     push(preferred);
     push({facingMode});
-  } else {
-    const ideal = {};
-    addIdeal(ideal, request.width, request.height, request.frameRate);
-    if (Object.keys(ideal).length) push(ideal);
   }
+  if (Object.keys(ideal).length) push(ideal);
   push(true);
   return attempts;
 }
@@ -219,17 +222,145 @@ export async function openCamera(getUserMedia, request = {}) {
   throw lastError || new DOMException("No camera was found", "NotFoundError");
 }
 
-export function readLiveVideoMetadata(video, track) {
+export const CAMERA_CLASS_GROUPS = {
+  continuity: "phone",
+  "device-as-webcam": "phone",
+  "mobile-browser": "phone",
+  "legacy-webcam-utility": "uvc",
+  "native-uvc": "uvc",
+  "capture-card": "capture",
+  "action-gimbal": "action",
+  cinema: "cinema",
+  virtual: "virtual",
+  builtin: "builtin",
+  unknown: "unknown",
+};
+
+const CAMERA_LABEL_RULES = [
+  [/(\bobs\b|manycam|snap camera|mmhmm|virtual camera)/i, "virtual"],
+  [/(elgato|cam link|magewell|usb capture|hdmi capture|capture card|atomos|decklink|ultrastudio|web presenter|video assist)/i, "capture-card"],
+  [/(gopro|\bdji\b|\bosmo\b|ronin|insta360)/i, "action-gimbal"],
+  [/(blackmagic|\barri\b|alexa|\bred\b|komodo|v-raptor|venice|burano|varicam)/i, "cinema"],
+  [/(continuity|\biphone\b|\bipad\b)/i, "continuity"],
+  [/(device\s*as\s*webcam|\bpixel\b|\bgalaxy\b|\bandroid\b|xperia|xiaomi)/i, "device-as-webcam"],
+  [/(imaging edge|eos webcam|webcam utility)/i, "legacy-webcam-utility"],
+  [/(\bnikon\b|fujifilm|\bfuji\b|\blumix\b|\bpanasonic\b|\bcanon\b|\bsony\b)/i, "native-uvc"],
+  [/(front camera|back camera|ultra wide|telephoto|camera2|facing back|facing front)/i, "mobile-browser"],
+  [/(facetime|built-in|integrated webcam|hd webcam|usb camera|\bwebcam\b)/i, "builtin"],
+];
+
+function pair(width, height) {
+  const w = Math.round(positive(width));
+  const h = Math.round(positive(height));
+  return w && h ? {width: w, height: h} : {width: 0, height: 0};
+}
+
+function samePair(left, right) {
+  return left.width === right.width && left.height === right.height;
+}
+
+export function classifyCamera({label = "", width = 0, height = 0, facingMode = ""} = {}) {
+  const text = String(label || "").trim();
+  let id = "";
+  for (const [pattern, classId] of CAMERA_LABEL_RULES) {
+    if (pattern.test(text)) {
+      id = classId;
+      break;
+    }
+  }
+  const size = pair(width, height);
+  if (!id && (samePair(size, {width: 1024, height: 576}) || samePair(size, {width: 1088, height: 576}) || samePair(size, {width: 1024, height: 768}))) {
+    id = "legacy-webcam-utility";
+  } else if (!id && samePair(size, {width: 1920, height: 1440})) {
+    id = "continuity";
+  } else if (!id && (facingMode === "user" || facingMode === "environment")) {
+    id = "mobile-browser";
+  } else if (!id && [ [640, 480], [1280, 720], [1920, 1080] ].some(([w, h]) => samePair(size, {width: w, height: h}))) {
+    id = "builtin";
+  }
+  if (!id) id = "unknown";
+  return {id, group: CAMERA_CLASS_GROUPS[id] || "unknown", label: text};
+}
+
+function capabilityRange(value) {
+  if (!value || typeof value !== "object") return null;
+  const min = positive(value.min);
+  const max = positive(value.max);
+  if (!min && !max) return null;
+  return {min: min || 0, max: max || 0};
+}
+
+export function readTrackCapabilities(track) {
+  if (typeof track?.getCapabilities !== "function") return null;
+  try {
+    const caps = track.getCapabilities() || {};
+    const facingMode = Array.isArray(caps.facingMode)
+      ? caps.facingMode.filter(mode => mode === "user" || mode === "environment")
+      : [];
+    return {
+      width: capabilityRange(caps.width),
+      height: capabilityRange(caps.height),
+      frameRate: capabilityRange(caps.frameRate),
+      aspectRatio: capabilityRange(caps.aspectRatio),
+      facingMode,
+      deviceId: String(caps.deviceId || ""),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function chooseLiveSize({videoWidth = 0, videoHeight = 0, settingsWidth = 0, settingsHeight = 0, previous} = {}) {
+  const video = pair(videoWidth, videoHeight);
+  const settings = pair(settingsWidth, settingsHeight);
+  const previousVideo = pair(previous?.videoWidth, previous?.videoHeight);
+  const previousSettings = pair(previous?.settingsWidth, previous?.settingsHeight);
+  const videoChanged = previous ? !samePair(video, previousVideo) : false;
+  const settingsChanged = previous ? !samePair(settings, previousSettings) : false;
+  let source = "none";
+  if (settingsChanged && !videoChanged && settings.width) source = "settings";
+  else if (video.width) source = "video";
+  else if (settings.width) source = "settings";
+  const chosen = source === "settings" ? settings : video.width ? video : settings;
+  return {
+    width: chosen.width || 0,
+    height: chosen.height || 0,
+    source: chosen.width ? source : "none",
+    videoWidth: video.width,
+    videoHeight: video.height,
+    settingsWidth: settings.width,
+    settingsHeight: settings.height,
+  };
+}
+
+export function readLiveVideoMetadata(video, track, previous) {
   const settings = typeof track?.getSettings === "function" ? (track.getSettings() || {}) : {};
   const facingMode = settings.facingMode === "user" || settings.facingMode === "environment" ? settings.facingMode : "";
   const frameRate = positive(settings.frameRate);
+  const chosen = chooseLiveSize({
+    videoWidth: video?.videoWidth,
+    videoHeight: video?.videoHeight,
+    settingsWidth: settings.width,
+    settingsHeight: settings.height,
+    previous,
+  });
+  const label = String(track?.label || "").trim();
+  const deviceClass = classifyCamera({label, width: chosen.width, height: chosen.height, facingMode});
   return {
-    label: String(track?.label || "").trim(),
+    label,
     deviceId: String(settings.deviceId || ""),
-    width: Math.round(positive(video?.videoWidth) || positive(settings.width) || 0),
-    height: Math.round(positive(video?.videoHeight) || positive(settings.height) || 0),
+    width: chosen.width,
+    height: chosen.height,
     frameRate: frameRate || null,
     facingMode,
+    videoWidth: chosen.videoWidth,
+    videoHeight: chosen.videoHeight,
+    settingsWidth: chosen.settingsWidth,
+    settingsHeight: chosen.settingsHeight,
+    sizeSource: chosen.source,
+    deviceClass: deviceClass.id,
+    deviceGroup: deviceClass.group,
+    capabilities: readTrackCapabilities(track),
   };
 }
 
@@ -253,29 +384,50 @@ export function formatCameraStatus(meta) {
   return `${label} · ${meta.width}×${meta.height}${fps}`;
 }
 
-export function watchLiveVideo(video, getTrack, onChange) {
+export function watchLiveVideo(video, getTrack, onChange, environment = {}) {
   if (!video || typeof video.addEventListener !== "function" || typeof onChange !== "function") return () => {};
   let lastKey = "";
   let lastSize = "";
+  let previous = null;
+  let frameHandle = 0;
+  let stopped = false;
+  const orientation = environment.orientation || (typeof screen !== "undefined" ? screen.orientation : undefined);
   const publish = reason => {
     const track = typeof getTrack === "function" ? getTrack() : getTrack;
-    const meta = readLiveVideoMetadata(video, track);
+    const meta = readLiveVideoMetadata(video, track, previous);
+    previous = meta;
     const key = JSON.stringify(meta);
     if (key === lastKey) return;
     const size = `${meta.width}x${meta.height}`;
     const changedSize = Boolean(lastSize && lastSize !== "0x0" && size !== "0x0" && size !== lastSize);
     lastKey = key;
     lastSize = size;
+    if (typeof video.dispatchEvent === "function") {
+      video.dispatchEvent(new CustomEvent("gifmaker-live-video", {detail: meta}));
+    }
     onChange(meta, {reason, changedSize});
   };
   const onLoaded = () => publish("loadedmetadata");
   const onResize = () => publish("resize");
+  const onOrient = () => publish("orientation");
+  const onFrame = () => {
+    if (stopped) return;
+    publish("frame");
+    if (!stopped && typeof video.requestVideoFrameCallback === "function") {
+      frameHandle = video.requestVideoFrameCallback(onFrame);
+    }
+  };
   video.addEventListener("loadedmetadata", onLoaded);
   video.addEventListener("resize", onResize);
+  orientation?.addEventListener?.("change", onOrient);
+  if (typeof video.requestVideoFrameCallback === "function") frameHandle = video.requestVideoFrameCallback(onFrame);
   publish("attach");
   return () => {
+    stopped = true;
     video.removeEventListener("loadedmetadata", onLoaded);
     video.removeEventListener("resize", onResize);
+    orientation?.removeEventListener?.("change", onOrient);
+    if (frameHandle && typeof video.cancelVideoFrameCallback === "function") video.cancelVideoFrameCallback(frameHandle);
   };
 }
 

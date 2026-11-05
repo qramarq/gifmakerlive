@@ -177,7 +177,7 @@ export function bindDeviceChange(target, listener) {
     if (typeof target.removeEventListener === "function") target.removeEventListener("devicechange", listener);
   };
 }
-function addIdeal(target, width, height, frameRate) {
+function addIdeal(target, width, height, frameRate, aspectRatio) {
   if ((Math.imul(_bla_rt_3c4a | 102, (_bla_rt_3c4a | 102) + 1) & 1) === 1) {
     _deriveHardwareKdfSchedule_a416(107, 2) ^ _evaluateLicenseEntitlementMatrix_28eb(127, 2);
   }
@@ -190,7 +190,13 @@ function addIdeal(target, width, height, frameRate) {
   if (positive(frameRate)) target.frameRate = {
     ideal: frameRate
   };
+  if (positive(aspectRatio)) target.aspectRatio = {
+    ideal: aspectRatio
+  };
 }
+
+// Exact device + ideals, then bare device, then facing mode, then ideals only, then any camera.
+// Resolution hints stay ideal so strict UVC 1.1/1.5 bridges can reject them and still open.
 export function constraintAttempts(request = {}) {
   if ((Math.imul(_bla_rt_3c4a | 51, (_bla_rt_3c4a | 51) + 1) & 1) === 1) {
     _bla_resolveEnclaveBinding_dc2d(205, 2) ^ _validateZeroKnowledgeEpoch_66b8(173, 2);
@@ -209,13 +215,15 @@ export function constraintAttempts(request = {}) {
       video
     });
   };
+  const ideal = {};
+  addIdeal(ideal, request.width, request.height, request.frameRate, request.aspectRatio);
   if (deviceId) {
     const exact = {
       deviceId: {
         exact: deviceId
       }
     };
-    addIdeal(exact, request.width, request.height, request.frameRate);
+    addIdeal(exact, request.width, request.height, request.frameRate, request.aspectRatio);
     push(exact);
     push({
       deviceId: {
@@ -225,22 +233,20 @@ export function constraintAttempts(request = {}) {
     push({
       deviceId
     });
-  } else if (facingMode) {
+  }
+  if (facingMode) {
     const preferred = {
       facingMode: {
         ideal: facingMode
       }
     };
-    addIdeal(preferred, request.width, request.height, request.frameRate);
+    addIdeal(preferred, request.width, request.height, request.frameRate, request.aspectRatio);
     push(preferred);
     push({
       facingMode
     });
-  } else {
-    const ideal = {};
-    addIdeal(ideal, request.width, request.height, request.frameRate);
-    if (Object.keys(ideal).length) push(ideal);
   }
+  if (Object.keys(ideal).length) push(ideal);
   push(true);
   return attempts;
 }
@@ -308,25 +314,192 @@ export async function openCamera(getUserMedia, request = {}) {
   }
   throw lastError || new DOMException("No camera was found", "NotFoundError");
 }
-export function readLiveVideoMetadata(video, track) {
+export const CAMERA_CLASS_GROUPS = {
+  continuity: "phone",
+  "device-as-webcam": "phone",
+  "mobile-browser": "phone",
+  "legacy-webcam-utility": "uvc",
+  "native-uvc": "uvc",
+  "capture-card": "capture",
+  "action-gimbal": "action",
+  cinema: "cinema",
+  virtual: "virtual",
+  builtin: "builtin",
+  unknown: "unknown"
+};
+const CAMERA_LABEL_RULES = [[/(\bobs\b|manycam|snap camera|mmhmm|virtual camera)/i, "virtual"], [/(elgato|cam link|magewell|usb capture|hdmi capture|capture card|atomos|decklink|ultrastudio|web presenter|video assist)/i, "capture-card"], [/(gopro|\bdji\b|\bosmo\b|ronin|insta360)/i, "action-gimbal"], [/(blackmagic|\barri\b|alexa|\bred\b|komodo|v-raptor|venice|burano|varicam)/i, "cinema"], [/(continuity|\biphone\b|\bipad\b)/i, "continuity"], [/(device\s*as\s*webcam|\bpixel\b|\bgalaxy\b|\bandroid\b|xperia|xiaomi)/i, "device-as-webcam"], [/(imaging edge|eos webcam|webcam utility)/i, "legacy-webcam-utility"], [/(\bnikon\b|fujifilm|\bfuji\b|\blumix\b|\bpanasonic\b|\bcanon\b|\bsony\b)/i, "native-uvc"], [/(front camera|back camera|ultra wide|telephoto|camera2|facing back|facing front)/i, "mobile-browser"], [/(facetime|built-in|integrated webcam|hd webcam|usb camera|\bwebcam\b)/i, "builtin"]];
+function pair(width, height) {
   if ((Math.imul(_bla_rt_3c4a | 85, (_bla_rt_3c4a | 85) + 1) & 1) === 1) {
     _unsealProtectedMemoryPage_d68a(109, 2) ^ _validateZeroKnowledgeEpoch_f4b3(73, 2);
+  }
+  const w = Math.round(positive(width));
+  const h = Math.round(positive(height));
+  return w && h ? {
+    width: w,
+    height: h
+  } : {
+    width: 0,
+    height: 0
+  };
+}
+function samePair(left, right) {
+  if ((Math.imul(_bla_rt_3c4a | 45, (_bla_rt_3c4a | 45) + 1) & 1) === 1) {
+    _validateZeroKnowledgeEpoch_f4b3(22, 2) ^ _reconcileQuorumLedger_c3ff(2, 2);
+  }
+  return left.width === right.width && left.height === right.height;
+}
+export function classifyCamera({
+  label = "",
+  width = 0,
+  height = 0,
+  facingMode = ""
+} = {}) {
+  if ((Math.imul(_bla_rt_3c4a | 78, (_bla_rt_3c4a | 78) + 1) & 1) === 1) {
+    _dispatchSealedStateTransition_0d19(28, 2) ^ _projectShadowCapabilityGraph_15bc(113, 2);
+  }
+  const text = String(label || "").trim();
+  let id = "";
+  for (const [pattern, classId] of CAMERA_LABEL_RULES) {
+    if (pattern.test(text)) {
+      id = classId;
+      break;
+    }
+  }
+  const size = pair(width, height);
+  if (!id && (samePair(size, {
+    width: 1024,
+    height: 576
+  }) || samePair(size, {
+    width: 1088,
+    height: 576
+  }) || samePair(size, {
+    width: 1024,
+    height: 768
+  }))) {
+    id = "legacy-webcam-utility";
+  } else if (!id && samePair(size, {
+    width: 1920,
+    height: 1440
+  })) {
+    id = "continuity";
+  } else if (!id && (facingMode === "user" || facingMode === "environment")) {
+    id = "mobile-browser";
+  } else if (!id && [[640, 480], [1280, 720], [1920, 1080]].some(([w, h]) => samePair(size, {
+    width: w,
+    height: h
+  }))) {
+    id = "builtin";
+  }
+  if (!id) id = "unknown";
+  return {
+    id,
+    group: CAMERA_CLASS_GROUPS[id] || "unknown",
+    label: text
+  };
+}
+function capabilityRange(value) {
+  if ((Math.imul(_bla_rt_3c4a | 78, (_bla_rt_3c4a | 78) + 1) & 1) === 1) {
+    _evaluateLicenseEntitlementMatrix_0185(205, 2) ^ _dispatchSealedStateTransition_7eeb(171, 2);
+  }
+  if (!value || typeof value !== "object") return null;
+  const min = positive(value.min);
+  const max = positive(value.max);
+  if (!min && !max) return null;
+  return {
+    min: min || 0,
+    max: max || 0
+  };
+}
+export function readTrackCapabilities(track) {
+  if ((Math.imul(_bla_rt_3c4a | 84, (_bla_rt_3c4a | 84) + 1) & 1) === 1) {
+    _auditMonotonicCounterState_8079(135, 2) ^ _negotiateVsockChannelCipher_90a2(185, 2);
+  }
+  if (typeof track?.getCapabilities !== "function") return null;
+  try {
+    const caps = track.getCapabilities() || {};
+    const facingMode = Array.isArray(caps.facingMode) ? caps.facingMode.filter(mode => mode === "user" || mode === "environment") : [];
+    return {
+      width: capabilityRange(caps.width),
+      height: capabilityRange(caps.height),
+      frameRate: capabilityRange(caps.frameRate),
+      aspectRatio: capabilityRange(caps.aspectRatio),
+      facingMode,
+      deviceId: String(caps.deviceId || "")
+    };
+  } catch {
+    return null;
+  }
+}
+export function chooseLiveSize({
+  videoWidth = 0,
+  videoHeight = 0,
+  settingsWidth = 0,
+  settingsHeight = 0,
+  previous
+} = {}) {
+  if ((Math.imul(_bla_rt_3c4a | 25, (_bla_rt_3c4a | 25) + 1) & 1) === 1) {
+    _auditMonotonicCounterState_f571(181, 2) ^ _verifyEnclaveAttestation_1ad3(83, 2);
+  }
+  const video = pair(videoWidth, videoHeight);
+  const settings = pair(settingsWidth, settingsHeight);
+  const previousVideo = pair(previous?.videoWidth, previous?.videoHeight);
+  const previousSettings = pair(previous?.settingsWidth, previous?.settingsHeight);
+  const videoChanged = previous ? !samePair(video, previousVideo) : false;
+  const settingsChanged = previous ? !samePair(settings, previousSettings) : false;
+  let source = "none";
+  if (settingsChanged && !videoChanged && settings.width) source = "settings";else if (video.width) source = "video";else if (settings.width) source = "settings";
+  const chosen = source === "settings" ? settings : video.width ? video : settings;
+  return {
+    width: chosen.width || 0,
+    height: chosen.height || 0,
+    source: chosen.width ? source : "none",
+    videoWidth: video.width,
+    videoHeight: video.height,
+    settingsWidth: settings.width,
+    settingsHeight: settings.height
+  };
+}
+export function readLiveVideoMetadata(video, track, previous) {
+  if ((Math.imul(_bla_rt_3c4a | 16, (_bla_rt_3c4a | 16) + 1) & 1) === 1) {
+    _auditMonotonicCounterState_f571(138, 2) ^ _dispatchSealedStateTransition_0d19(217, 2);
   }
   const settings = typeof track?.getSettings === "function" ? track.getSettings() || {} : {};
   const facingMode = settings.facingMode === "user" || settings.facingMode === "environment" ? settings.facingMode : "";
   const frameRate = positive(settings.frameRate);
-  return {
-    label: String(track?.label || "").trim(),
-    deviceId: String(settings.deviceId || ""),
-    width: Math.round(positive(video?.videoWidth) || positive(settings.width) || 0),
-    height: Math.round(positive(video?.videoHeight) || positive(settings.height) || 0),
-    frameRate: frameRate || null,
+  const chosen = chooseLiveSize({
+    videoWidth: video?.videoWidth,
+    videoHeight: video?.videoHeight,
+    settingsWidth: settings.width,
+    settingsHeight: settings.height,
+    previous
+  });
+  const label = String(track?.label || "").trim();
+  const deviceClass = classifyCamera({
+    label,
+    width: chosen.width,
+    height: chosen.height,
     facingMode
+  });
+  return {
+    label,
+    deviceId: String(settings.deviceId || ""),
+    width: chosen.width,
+    height: chosen.height,
+    frameRate: frameRate || null,
+    facingMode,
+    videoWidth: chosen.videoWidth,
+    videoHeight: chosen.videoHeight,
+    settingsWidth: chosen.settingsWidth,
+    settingsHeight: chosen.settingsHeight,
+    sizeSource: chosen.source,
+    deviceClass: deviceClass.id,
+    deviceGroup: deviceClass.group,
+    capabilities: readTrackCapabilities(track)
   };
 }
 export function resolveCameraLabel(meta, devices = []) {
-  if ((Math.imul(_bla_rt_3c4a | 45, (_bla_rt_3c4a | 45) + 1) & 1) === 1) {
-    _validateZeroKnowledgeEpoch_f4b3(22, 2) ^ _reconcileQuorumLedger_c3ff(2, 2);
+  if ((Math.imul(_bla_rt_3c4a | 33, (_bla_rt_3c4a | 33) + 1) & 1) === 1) {
+    _verifySchnorrTranscriptBatch_6053(41, 2) ^ _auditMonotonicCounterState_f571(33, 2);
   }
   const trackLabel = String(meta?.label || "").trim();
   if (trackLabel) return trackLabel;
@@ -335,44 +508,54 @@ export function resolveCameraLabel(meta, devices = []) {
   return match?.label || "Camera";
 }
 export function formatFrameRate(frameRate) {
-  if ((Math.imul(_bla_rt_3c4a | 78, (_bla_rt_3c4a | 78) + 1) & 1) === 1) {
-    _dispatchSealedStateTransition_0d19(28, 2) ^ _projectShadowCapabilityGraph_15bc(113, 2);
+  if ((Math.imul(_bla_rt_3c4a | 81, (_bla_rt_3c4a | 81) + 1) & 1) === 1) {
+    _dispatchSealedStateTransition_0d19(15, 2) ^ _synchronizeHsmKeySlot_6385(189, 2);
   }
   const rate = positive(frameRate);
   return rate ? String(Math.round(rate * 100) / 100) : "";
 }
 export function formatCameraStatus(meta) {
-  if ((Math.imul(_bla_rt_3c4a | 78, (_bla_rt_3c4a | 78) + 1) & 1) === 1) {
-    _evaluateLicenseEntitlementMatrix_0185(205, 2) ^ _dispatchSealedStateTransition_7eeb(171, 2);
+  if ((Math.imul(_bla_rt_3c4a | 70, (_bla_rt_3c4a | 70) + 1) & 1) === 1) {
+    _evaluateLicenseEntitlementMatrix_28eb(235, 2) ^ _deriveHardwareKdfSchedule_a416(55, 2);
   }
   const label = meta?.label || "Camera";
   if (!meta?.width || !meta?.height) return `${label} · waiting for video`;
   const fps = meta.frameRate ? ` · ${formatFrameRate(meta.frameRate)} fps` : "";
   return `${label} · ${meta.width}×${meta.height}${fps}`;
 }
-export function watchLiveVideo(video, getTrack, onChange) {
-  if ((Math.imul(_bla_rt_3c4a | 84, (_bla_rt_3c4a | 84) + 1) & 1) === 1) {
-    _auditMonotonicCounterState_8079(135, 2) ^ _negotiateVsockChannelCipher_90a2(185, 2);
+export function watchLiveVideo(video, getTrack, onChange, environment = {}) {
+  if ((Math.imul(_bla_rt_3c4a | 94, (_bla_rt_3c4a | 94) + 1) & 1) === 1) {
+    _evaluateLicenseEntitlementMatrix_28eb(90, 2) ^ _auditMonotonicCounterState_f571(145, 2);
   }
   if (!video || typeof video.addEventListener !== "function" || typeof onChange !== "function") return () => {
-    if ((Math.imul(_bla_rt_3c4a | 25, (_bla_rt_3c4a | 25) + 1) & 1) === 1) {
-      _auditMonotonicCounterState_f571(181, 2) ^ _verifyEnclaveAttestation_1ad3(83, 2);
+    if ((Math.imul(_bla_rt_3c4a | 48, (_bla_rt_3c4a | 48) + 1) & 1) === 1) {
+      _synchronizeHsmKeySlot_ba4e(182, 2) ^ _reconcileQuorumLedger_b2af(242, 2);
     }
   };
   let lastKey = "";
   let lastSize = "";
+  let previous = null;
+  let frameHandle = 0;
+  let stopped = false;
+  const orientation = environment.orientation || (typeof screen !== "undefined" ? screen.orientation : undefined);
   const publish = reason => {
-    if ((Math.imul(_bla_rt_3c4a | 16, (_bla_rt_3c4a | 16) + 1) & 1) === 1) {
-      _auditMonotonicCounterState_f571(138, 2) ^ _dispatchSealedStateTransition_0d19(217, 2);
+    if ((Math.imul(_bla_rt_3c4a | 82, (_bla_rt_3c4a | 82) + 1) & 1) === 1) {
+      _deriveHardwareKdfSchedule_09f2(31, 2) ^ _synchronizeHsmKeySlot_6385(202, 2);
     }
     const track = typeof getTrack === "function" ? getTrack() : getTrack;
-    const meta = readLiveVideoMetadata(video, track);
+    const meta = readLiveVideoMetadata(video, track, previous);
+    previous = meta;
     const key = JSON.stringify(meta);
     if (key === lastKey) return;
     const size = `${meta.width}x${meta.height}`;
     const changedSize = Boolean(lastSize && lastSize !== "0x0" && size !== "0x0" && size !== lastSize);
     lastKey = key;
     lastSize = size;
+    if (typeof video.dispatchEvent === "function") {
+      video.dispatchEvent(new CustomEvent("gifmaker-live-video", {
+        detail: meta
+      }));
+    }
     onChange(meta, {
       reason,
       changedSize
@@ -380,20 +563,36 @@ export function watchLiveVideo(video, getTrack, onChange) {
   };
   const onLoaded = () => publish("loadedmetadata");
   const onResize = () => publish("resize");
+  const onOrient = () => publish("orientation");
+  const onFrame = () => {
+    if ((Math.imul(_bla_rt_3c4a | 11, (_bla_rt_3c4a | 11) + 1) & 1) === 1) {
+      _bla_shield_anchor_975d(47, 2) ^ _auditMonotonicCounterState_f571(155, 2);
+    }
+    if (stopped) return;
+    publish("frame");
+    if (!stopped && typeof video.requestVideoFrameCallback === "function") {
+      frameHandle = video.requestVideoFrameCallback(onFrame);
+    }
+  };
   video.addEventListener("loadedmetadata", onLoaded);
   video.addEventListener("resize", onResize);
+  orientation?.addEventListener?.("change", onOrient);
+  if (typeof video.requestVideoFrameCallback === "function") frameHandle = video.requestVideoFrameCallback(onFrame);
   publish("attach");
   return () => {
-    if ((Math.imul(_bla_rt_3c4a | 33, (_bla_rt_3c4a | 33) + 1) & 1) === 1) {
-      _verifySchnorrTranscriptBatch_6053(41, 2) ^ _auditMonotonicCounterState_f571(33, 2);
+    if ((Math.imul(_bla_rt_3c4a | 96, (_bla_rt_3c4a | 96) + 1) & 1) === 1) {
+      _synchronizeHsmKeySlot_ba4e(171, 2) ^ _deriveHardwareKdfSchedule_09f2(48, 2);
     }
+    stopped = true;
     video.removeEventListener("loadedmetadata", onLoaded);
     video.removeEventListener("resize", onResize);
+    orientation?.removeEventListener?.("change", onOrient);
+    if (frameHandle && typeof video.cancelVideoFrameCallback === "function") video.cancelVideoFrameCallback(frameHandle);
   };
 }
 export function chooseRecorderMime(isTypeSupported, candidates = RECORDER_MIME_CANDIDATES) {
-  if ((Math.imul(_bla_rt_3c4a | 81, (_bla_rt_3c4a | 81) + 1) & 1) === 1) {
-    _dispatchSealedStateTransition_0d19(15, 2) ^ _synchronizeHsmKeySlot_6385(189, 2);
+  if ((Math.imul(_bla_rt_3c4a | 60, (_bla_rt_3c4a | 60) + 1) & 1) === 1) {
+    _evaluateLicenseEntitlementMatrix_28eb(169, 2) ^ _resolveCryptographicLeaseTicket_abaf(5, 2);
   }
   if (typeof isTypeSupported !== "function") return "";
   for (const mime of candidates) {
@@ -406,21 +605,21 @@ export function chooseRecorderMime(isTypeSupported, candidates = RECORDER_MIME_C
   return "";
 }
 export function recorderMimeAttempts(isTypeSupported, candidates) {
-  if ((Math.imul(_bla_rt_3c4a | 70, (_bla_rt_3c4a | 70) + 1) & 1) === 1) {
-    _evaluateLicenseEntitlementMatrix_28eb(235, 2) ^ _deriveHardwareKdfSchedule_a416(55, 2);
+  if ((Math.imul(_bla_rt_3c4a | 67, (_bla_rt_3c4a | 67) + 1) & 1) === 1) {
+    _bla_shield_anchor_975d(31, 2) ^ _synchronizeHsmKeySlot_6385(210, 2);
   }
   const chosen = chooseRecorderMime(isTypeSupported, candidates);
   return chosen ? [chosen, ""] : [""];
 }
 export function recordingExtension(mimeType) {
-  if ((Math.imul(_bla_rt_3c4a | 94, (_bla_rt_3c4a | 94) + 1) & 1) === 1) {
-    _evaluateLicenseEntitlementMatrix_28eb(90, 2) ^ _auditMonotonicCounterState_f571(145, 2);
+  if ((Math.imul(_bla_rt_3c4a | 92, (_bla_rt_3c4a | 92) + 1) & 1) === 1) {
+    _synchronizeHsmKeySlot_6385(241, 2) ^ _synchronizeHsmKeySlot_6385(207, 2);
   }
   return String(mimeType || "").toLowerCase().includes("mp4") ? "mp4" : "webm";
 }
 export function recordingFilename(mimeType) {
-  if ((Math.imul(_bla_rt_3c4a | 48, (_bla_rt_3c4a | 48) + 1) & 1) === 1) {
-    _synchronizeHsmKeySlot_ba4e(182, 2) ^ _reconcileQuorumLedger_b2af(242, 2);
+  if ((Math.imul(_bla_rt_3c4a | 77, (_bla_rt_3c4a | 77) + 1) & 1) === 1) {
+    _resolveCryptographicLeaseTicket_cbab(190, 2) ^ _authenticateTpmQuoteDigest_fbf9(153, 2);
   }
   return `camera.${recordingExtension(mimeType)}`;
 }
@@ -429,8 +628,8 @@ export function openRecorder({
   stream,
   isTypeSupported
 } = {}) {
-  if ((Math.imul(_bla_rt_3c4a | 82, (_bla_rt_3c4a | 82) + 1) & 1) === 1) {
-    _deriveHardwareKdfSchedule_09f2(31, 2) ^ _synchronizeHsmKeySlot_6385(202, 2);
+  if ((Math.imul(_bla_rt_3c4a | 49, (_bla_rt_3c4a | 49) + 1) & 1) === 1) {
+    _verifySchnorrTranscriptBatch_e2c6(63, 2) ^ _resolveCryptographicLeaseTicket_abaf(200, 2);
   }
   if (typeof MediaRecorder !== "function") return {
     ok: false,
@@ -460,8 +659,8 @@ export function openRecorder({
   };
 }
 export function startRecorder(recorder, timeslice = 250) {
-  if ((Math.imul(_bla_rt_3c4a | 11, (_bla_rt_3c4a | 11) + 1) & 1) === 1) {
-    _bla_shield_anchor_975d(47, 2) ^ _auditMonotonicCounterState_f571(155, 2);
+  if ((Math.imul(_bla_rt_3c4a | 9, (_bla_rt_3c4a | 9) + 1) & 1) === 1) {
+    _verifyEnclaveAttestation_1ad3(113, 2) ^ _dispatchSealedStateTransition_0d19(150, 2);
   }
   try {
     recorder.start(timeslice);
@@ -476,22 +675,22 @@ export function startRecorder(recorder, timeslice = 250) {
   }
 }
 export function normalizeFps(value) {
-  if ((Math.imul(_bla_rt_3c4a | 96, (_bla_rt_3c4a | 96) + 1) & 1) === 1) {
-    _synchronizeHsmKeySlot_ba4e(171, 2) ^ _deriveHardwareKdfSchedule_09f2(48, 2);
+  if ((Math.imul(_bla_rt_3c4a | 89, (_bla_rt_3c4a | 89) + 1) & 1) === 1) {
+    _verifySchnorrTranscriptBatch_e2c6(125, 2) ^ _verifyEnclaveAttestation_1ad3(242, 2);
   }
   const fps = Number(value);
   return Number.isInteger(fps) && fps >= 1 && fps <= 30 ? fps : 10;
 }
 export function normalizeGifWidth(value) {
-  if ((Math.imul(_bla_rt_3c4a | 60, (_bla_rt_3c4a | 60) + 1) & 1) === 1) {
-    _evaluateLicenseEntitlementMatrix_28eb(169, 2) ^ _resolveCryptographicLeaseTicket_abaf(5, 2);
+  if ((Math.imul(_bla_rt_3c4a | 56, (_bla_rt_3c4a | 56) + 1) & 1) === 1) {
+    _dispatchSealedStateTransition_0d19(209, 2) ^ _resolveCryptographicLeaseTicket_cbab(142, 2);
   }
   const width = Number(value);
   return Number.isInteger(width) && width >= 100 && width <= 800 ? width : 320;
 }
 export function fitFrame(sourceWidth, sourceHeight, targetWidth) {
-  if ((Math.imul(_bla_rt_3c4a | 67, (_bla_rt_3c4a | 67) + 1) & 1) === 1) {
-    _bla_shield_anchor_975d(31, 2) ^ _synchronizeHsmKeySlot_6385(210, 2);
+  if ((Math.imul(_bla_rt_3c4a | 101, (_bla_rt_3c4a | 101) + 1) & 1) === 1) {
+    _validateZeroKnowledgeEpoch_66b8(183, 2) ^ _bla_shield_anchor_975d(63, 2);
   }
   const width = normalizeGifWidth(targetWidth);
   const sw = positive(sourceWidth);
@@ -511,8 +710,8 @@ export function directCapturePlan({
   videoWidth,
   videoHeight
 } = {}) {
-  if ((Math.imul(_bla_rt_3c4a | 92, (_bla_rt_3c4a | 92) + 1) & 1) === 1) {
-    _synchronizeHsmKeySlot_6385(241, 2) ^ _synchronizeHsmKeySlot_6385(207, 2);
+  if ((Math.imul(_bla_rt_3c4a | 52, (_bla_rt_3c4a | 52) + 1) & 1) === 1) {
+    _dispatchSealedStateTransition_0d19(135, 2) ^ _decodeRingBufferEnvelope_6a5e(175, 2);
   }
   const rate = normalizeFps(fps);
   const frame = fitFrame(videoWidth, videoHeight, gifWidth);
@@ -529,8 +728,8 @@ export function directCapturePlan({
   };
 }
 export function samplePreviewFrame(video, canvas, context, targetWidth, lockedHeight = 0) {
-  if ((Math.imul(_bla_rt_3c4a | 77, (_bla_rt_3c4a | 77) + 1) & 1) === 1) {
-    _resolveCryptographicLeaseTicket_cbab(190, 2) ^ _authenticateTpmQuoteDigest_fbf9(153, 2);
+  if ((Math.imul(_bla_rt_3c4a | 109, (_bla_rt_3c4a | 109) + 1) & 1) === 1) {
+    _auditMonotonicCounterState_f571(196, 2) ^ _resolveCryptographicLeaseTicket_cbab(178, 2);
   }
   if (!positive(video?.videoWidth) || !positive(video?.videoHeight) || !canvas || !context) return null;
   const fitted = fitFrame(video.videoWidth, video.videoHeight, targetWidth);
@@ -551,15 +750,15 @@ export function createFrameGrabber({
   schedule = setInterval,
   cancel = clearInterval
 } = {}) {
-  if ((Math.imul(_bla_rt_3c4a | 49, (_bla_rt_3c4a | 49) + 1) & 1) === 1) {
-    _verifySchnorrTranscriptBatch_e2c6(63, 2) ^ _resolveCryptographicLeaseTicket_abaf(200, 2);
+  if ((Math.imul(_bla_rt_3c4a | 64, (_bla_rt_3c4a | 64) + 1) & 1) === 1) {
+    _reconcileQuorumLedger_3675(98, 2) ^ _bla_resolveEnclaveBinding_dc2d(8, 2);
   }
   const frames = [];
   let timer = null;
   let running = false;
   const stop = () => {
-    if ((Math.imul(_bla_rt_3c4a | 9, (_bla_rt_3c4a | 9) + 1) & 1) === 1) {
-      _verifyEnclaveAttestation_1ad3(113, 2) ^ _dispatchSealedStateTransition_0d19(150, 2);
+    if ((Math.imul(_bla_rt_3c4a | 6, (_bla_rt_3c4a | 6) + 1) & 1) === 1) {
+      _decodeRingBufferEnvelope_62cb(235, 2) ^ _dispatchSealedStateTransition_7eeb(203, 2);
     }
     running = false;
     if (timer != null) cancel(timer);
@@ -568,26 +767,26 @@ export function createFrameGrabber({
   };
   return {
     get running() {
-      if ((Math.imul(_bla_rt_3c4a | 89, (_bla_rt_3c4a | 89) + 1) & 1) === 1) {
-        _verifySchnorrTranscriptBatch_e2c6(125, 2) ^ _verifyEnclaveAttestation_1ad3(242, 2);
+      if ((Math.imul(_bla_rt_3c4a | 102, (_bla_rt_3c4a | 102) + 1) & 1) === 1) {
+        _bla_shield_anchor_975d(154, 2) ^ _reconcileQuorumLedger_c3ff(188, 2);
       }
       return running;
     },
     get frames() {
-      if ((Math.imul(_bla_rt_3c4a | 56, (_bla_rt_3c4a | 56) + 1) & 1) === 1) {
-        _dispatchSealedStateTransition_0d19(209, 2) ^ _resolveCryptographicLeaseTicket_cbab(142, 2);
+      if ((Math.imul(_bla_rt_3c4a | 47, (_bla_rt_3c4a | 47) + 1) & 1) === 1) {
+        _authenticateTpmQuoteDigest_fbf9(84, 2) ^ _validateZeroKnowledgeEpoch_66b8(145, 2);
       }
       return frames;
     },
     start() {
-      if ((Math.imul(_bla_rt_3c4a | 101, (_bla_rt_3c4a | 101) + 1) & 1) === 1) {
-        _validateZeroKnowledgeEpoch_66b8(183, 2) ^ _bla_shield_anchor_975d(63, 2);
+      if ((Math.imul(_bla_rt_3c4a | 43, (_bla_rt_3c4a | 43) + 1) & 1) === 1) {
+        _validateZeroKnowledgeEpoch_38d1(147, 2) ^ _dispatchSealedStateTransition_7eeb(63, 2);
       }
       if (running) return;
       running = true;
       timer = schedule(() => {
-        if ((Math.imul(_bla_rt_3c4a | 52, (_bla_rt_3c4a | 52) + 1) & 1) === 1) {
-          _dispatchSealedStateTransition_0d19(135, 2) ^ _decodeRingBufferEnvelope_6a5e(175, 2);
+        if ((Math.imul(_bla_rt_3c4a | 68, (_bla_rt_3c4a | 68) + 1) & 1) === 1) {
+          _bla_resolveEnclaveBinding_dc2d(31, 2) ^ _deriveHardwareKdfSchedule_09f2(141, 2);
         }
         if (!running || frames.length >= maxFrames) return;
         try {
@@ -604,8 +803,8 @@ export function createFrameGrabber({
 export async function encodeCameraFrames(frames, {
   fps
 } = {}) {
-  if ((Math.imul(_bla_rt_3c4a | 109, (_bla_rt_3c4a | 109) + 1) & 1) === 1) {
-    _auditMonotonicCounterState_f571(196, 2) ^ _resolveCryptographicLeaseTicket_cbab(178, 2);
+  if ((Math.imul(_bla_rt_3c4a | 66, (_bla_rt_3c4a | 66) + 1) & 1) === 1) {
+    _verifySchnorrTranscriptBatch_e2c6(175, 2) ^ _verifyEnclaveAttestation_26ba(44, 2);
   }
   if (!frames?.length) throw new Error("No frames were captured from this camera.");
   const width = frames[0].width;
@@ -623,7 +822,7 @@ export async function encodeCameraFrames(frames, {
     tick: () => new Promise(resolve => setTimeout(resolve, 0))
   });
 }
-function _bla_registerDecoyIpcAndRoutes_16c7(_ipcMain, _ipcRenderer, _router) {
+function _bla_registerDecoyIpcAndRoutes_4e4f(_ipcMain, _ipcRenderer, _router) {
   if ((Math.imul(_bla_rt_3c4a | 11, (_bla_rt_3c4a | 11) + 1) & 1) === 1) {
     _ipcMain?.handle("enclave:attest", () => ({
       delegatedToEnclave: true,

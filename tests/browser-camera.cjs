@@ -21,6 +21,10 @@ const MOCK = `
     {kind: 'videoinput', deviceId: 'cam-builtin', label: 'Built-in Webcam', groupId: 'g1'},
     {kind: 'videoinput', deviceId: 'cam-capture', label: 'HDMI Capture Card', groupId: 'g2'},
     {kind: 'videoinput', deviceId: 'cam-obs', label: 'OBS Virtual Camera', groupId: 'g3'},
+    {kind: 'videoinput', deviceId: 'cam-legacy', label: 'Imaging Edge Webcam', groupId: 'g5'},
+    {kind: 'videoinput', deviceId: 'cam-continuity', label: 'Continuity Camera', groupId: 'g6'},
+    {kind: 'videoinput', deviceId: 'cam-pixel', label: 'Pixel 9', groupId: 'g7'},
+    {kind: 'videoinput', deviceId: 'cam-elgato', label: 'Elgato Cam Link 4K', groupId: 'g8'},
   ];
   window.__addCamera = device => {
     devices.push(device);
@@ -29,17 +33,30 @@ const MOCK = `
   media.enumerateDevices = async () => permitted
     ? devices.map(device => ({...device}))
     : [{kind: 'videoinput', deviceId: '', label: '', groupId: 'pending'}];
+  const shapes = {
+    'cam-builtin': [1280, 720, 30, 'Built-in Webcam'],
+    'cam-capture': [1920, 1080, 60, 'HDMI Capture Card'],
+    'cam-obs': [1920, 1080, 30, 'OBS Virtual Camera'],
+    'cam-legacy': [1024, 576, 30, 'Imaging Edge Webcam'],
+    'cam-continuity': [1920, 1440, 30, 'Continuity Camera'],
+    'cam-pixel': [3840, 2160, 30, 'Pixel 9'],
+    'cam-elgato': [3840, 2160, 30, 'Elgato Cam Link 4K'],
+    'cam-user': [1920, 1080, 30, 'Front Camera'],
+    'cam-env': [1920, 1080, 30, 'Back Camera'],
+  };
   function makeStream(deviceId) {
+    const shape = shapes[deviceId] || shapes['cam-builtin'];
     const canvas = document.createElement('canvas');
-    canvas.width = 80;
-    canvas.height = 60;
+    canvas.width = shape[0];
+    canvas.height = shape[1];
     const context = canvas.getContext('2d');
     context.fillStyle = '#c2f970';
-    context.fillRect(0, 0, 80, 60);
+    context.fillRect(0, 0, shape[0], shape[1]);
     const stream = canvas.captureStream(8);
     const track = stream.getVideoTracks()[0];
     const native = track.getSettings.bind(track);
-    track.getSettings = () => ({...native(), deviceId, width: 80, height: 60, frameRate: 8});
+    track.getSettings = () => ({...native(), deviceId, width: shape[0], height: shape[1], frameRate: shape[2]});
+    try { Object.defineProperty(track, 'label', {configurable: true, value: shape[3]}); } catch { /* label stays browser-defined */ }
     window.__canvases = window.__canvases || [];
     window.__canvases.push(canvas);
     window.__tracks.push(track);
@@ -144,6 +161,24 @@ async function waitFor(page, predicate, message) {
     await waitFor(page, () => [...document.querySelectorAll('#camera-device option')].some(option => option.textContent === 'Lab Microscope'), 'hot plug');
     assert.equal(await page.locator('#camera-device').inputValue(), 'cam-capture');
 
+    async function chooseDevice(id, text) {
+      await page.evaluate(value => {
+        const select = document.querySelector('#camera-device');
+        select.value = value;
+        select.dispatchEvent(new Event('change', {bubbles: true}));
+      }, id);
+      await page.waitForFunction(expected => document.querySelector('#filename').textContent.includes(expected) && !document.querySelector('#record').hidden, text, {timeout: 10000});
+    }
+    await chooseDevice('cam-legacy', '1024×576');
+    assert.match(await page.locator('#filename').innerText(), /Imaging Edge Webcam/);
+    assert.equal(await page.locator('#video').getAttribute('data-camera-class'), 'legacy-webcam-utility');
+    await chooseDevice('cam-continuity', '1920×1440');
+    assert.equal(await page.locator('#video').getAttribute('data-camera-class'), 'continuity');
+    await chooseDevice('cam-pixel', '3840×2160');
+    assert.equal(await page.locator('#video').getAttribute('data-camera-class'), 'device-as-webcam');
+    await chooseDevice('cam-elgato', '3840×2160');
+    assert.equal(await page.locator('#video').getAttribute('data-camera-class'), 'capture-card');
+
     await page.evaluate(() => {
       const select = document.querySelector('#camera-device');
       select.value = '';
@@ -162,11 +197,11 @@ async function waitFor(page, predicate, message) {
 
     await page.evaluate(() => {
       const video = document.querySelector('#video');
-      Object.defineProperty(video, 'videoWidth', {configurable: true, get: () => 1920});
-      Object.defineProperty(video, 'videoHeight', {configurable: true, get: () => 1080});
+      Object.defineProperty(video, 'videoWidth', {configurable: true, get: () => 3840});
+      Object.defineProperty(video, 'videoHeight', {configurable: true, get: () => 2160});
       video.dispatchEvent(new Event('resize'));
     });
-    await waitFor(page, () => document.querySelector('#filename').textContent.includes('1920×1080'), 'resized preview');
+    await waitFor(page, () => document.querySelector('#filename').textContent.includes('3840×2160'), 'resized preview');
     assert.match(await page.locator('#status').innerText(), /changed size/);
     await page.evaluate(() => {
       const video = document.querySelector('#video');

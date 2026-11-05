@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  CAMERA_CLASS_GROUPS,
   DEFAULT_CAPTURE_IDEAL,
   bindDeviceChange,
   cameraErrorMessage,
   cameraSupport,
+  chooseLiveSize,
   chooseRecorderMime,
+  classifyCamera,
   constraintAttempts,
   createFrameGrabber,
   deviceOptions,
@@ -48,6 +51,7 @@ function liveTrack(extra = {}) {
     label: extra.label || "",
     stop() { this.readyState = "ended"; },
     getSettings: () => extra.settings || {},
+    getCapabilities: extra.capabilities ? () => extra.capabilities : undefined,
   };
 }
 
@@ -108,7 +112,7 @@ test("getUserMedia falls back from ideal and exact constraints", async () => {
   let stopped = 0;
   const opened = await openCamera(async constraints => {
     seen.push(constraints);
-    if (seen.length < 3) throw fail(seen.length === 2 ? "NotReadableError" : "OverconstrainedError");
+    if (seen.length < 3 || seen.length === 4) throw fail(seen.length === 2 ? "NotReadableError" : "OverconstrainedError");
     if (seen.length === 3) return streamFrom([{kind: "audio", readyState: "live", stop() { stopped += 1; }}]);
     return streamFrom([liveTrack({settings: {deviceId: "uvc"}})]);
   }, {deviceId: "uvc", ...DEFAULT_CAPTURE_IDEAL});
@@ -116,6 +120,7 @@ test("getUserMedia falls back from ideal and exact constraints", async () => {
     {deviceId: {exact: "uvc"}, width: {ideal: 1280}, height: {ideal: 720}, frameRate: {ideal: 30}},
     {deviceId: {exact: "uvc"}},
     {deviceId: "uvc"},
+    {width: {ideal: 1280}, height: {ideal: 720}, frameRate: {ideal: 30}},
     true,
   ]);
   assert.equal(stopped, 1);
@@ -174,6 +179,30 @@ test("a bare device request still reaches an unconstrained video stream", () => 
     {deviceId: "cam"},
     true,
   ]);
+  const ladder = constraintAttempts({
+    deviceId: "uvc",
+    facingMode: "environment",
+    width: 1280,
+    height: 720,
+    frameRate: 30,
+    aspectRatio: 1.7778,
+  }).map(item => item.video);
+  assert.deepEqual(ladder, [
+    {deviceId: {exact: "uvc"}, width: {ideal: 1280}, height: {ideal: 720}, frameRate: {ideal: 30}, aspectRatio: {ideal: 1.7778}},
+    {deviceId: {exact: "uvc"}},
+    {deviceId: "uvc"},
+    {facingMode: {ideal: "environment"}, width: {ideal: 1280}, height: {ideal: 720}, frameRate: {ideal: 30}, aspectRatio: {ideal: 1.7778}},
+    {facingMode: "environment"},
+    {width: {ideal: 1280}, height: {ideal: 720}, frameRate: {ideal: 30}, aspectRatio: {ideal: 1.7778}},
+    true,
+  ]);
+  for (const video of ladder) {
+    if (video === true) continue;
+    assert.equal(Boolean(video.deviceId && video.facingMode), false);
+    for (const key of ["width", "height", "frameRate", "aspectRatio"]) {
+      if (video[key]) assert.deepEqual(Object.keys(video[key]), ["ideal"]);
+    }
+  }
 });
 
 test("live metadata follows loadedmetadata and resize, then stops", () => {
@@ -294,6 +323,144 @@ test("direct frame capture scales the preview and encodes a looping GIF", async 
   assert.ok(bytes.includes(Buffer.from("NETSCAPE2.0")));
   await assert.rejects(() => encodeCameraFrames([], {fps: 10}), /No frames/);
   await assert.rejects(() => encodeCameraFrames([frame, {width: 1, height: 1, data: new Uint8ClampedArray(4)}], {fps: 10}), /changed size/);
+});
+
+test("UVC bridges, phone webcams, and live size follow the technical reference", async () => {
+  const classes = [
+    ["Continuity Camera", 1920, 1440, "continuity", "phone"],
+    ["Marq's iPhone", 1920, 1080, "continuity", "phone"],
+    ["Pixel 9", 3840, 2160, "device-as-webcam", "phone"],
+    ["Samsung Galaxy S26 Ultra", 1920, 1080, "device-as-webcam", "phone"],
+    ["Front Camera", 1080, 1920, "mobile-browser", "phone"],
+    ["camera2 0, facing back", 1920, 1080, "mobile-browser", "phone"],
+    ["Back Ultra Wide Camera", 1920, 1080, "mobile-browser", "phone"],
+    ["Imaging Edge Webcam", 1024, 576, "legacy-webcam-utility", "uvc"],
+    ["EOS Webcam Utility", 1024, 576, "legacy-webcam-utility", "uvc"],
+    ["Nikon Webcam Utility", 1024, 768, "legacy-webcam-utility", "uvc"],
+    ["Nikon Z 9", 1920, 1080, "native-uvc", "uvc"],
+    ["Canon EOS R5", 1920, 1080, "native-uvc", "uvc"],
+    ["Fujifilm X-H2S", 1920, 1080, "native-uvc", "uvc"],
+    ["Lumix S5II", 1280, 720, "native-uvc", "uvc"],
+    ["Sony FX3", 1920, 1080, "native-uvc", "uvc"],
+    ["Elgato Cam Link 4K", 3840, 2160, "capture-card", "capture"],
+    ["Magewell USB Capture HDMI 4K", 4096, 2160, "capture-card", "capture"],
+    ["Blackmagic Web Presenter", 1920, 1080, "capture-card", "capture"],
+    ["Atomos Connect", 1920, 1080, "capture-card", "capture"],
+    ["GoPro Webcam", 1920, 1080, "action-gimbal", "action"],
+    ["DJI Osmo Pocket 3", 1920, 1080, "action-gimbal", "action"],
+    ["Insta360 Link", 1920, 1080, "action-gimbal", "action"],
+    ["Blackmagic Pocket Cinema Camera", 1920, 1080, "cinema", "cinema"],
+    ["OBS Virtual Camera", 1920, 1080, "virtual", "virtual"],
+    ["FaceTime HD Camera", 1280, 720, "builtin", "builtin"],
+    ["", 1024, 576, "legacy-webcam-utility", "uvc"],
+    ["", 1920, 1440, "continuity", "phone"],
+  ];
+  for (const [label, width, height, id, group] of classes) {
+    const found = classifyCamera({label, width, height});
+    assert.equal(found.id, id, label || `${width}x${height}`);
+    assert.equal(found.group, group, label || `${width}x${height}`);
+    assert.equal(CAMERA_CLASS_GROUPS[id], group);
+  }
+
+  const legacy = await openCamera(async constraints => {
+    const video = constraints.video;
+    if (video && video !== true && (video.width || video.height || video.frameRate || video.facingMode)) throw fail("OverconstrainedError");
+    return streamFrom([liveTrack({
+      label: "Imaging Edge Webcam",
+      settings: {deviceId: "sony", width: 1024, height: 576, frameRate: 30},
+    })]);
+  }, {deviceId: "sony", ...DEFAULT_CAPTURE_IDEAL});
+  assert.deepEqual(legacy.constraints.video, {deviceId: {exact: "sony"}});
+  const legacyMeta = readLiveVideoMetadata({videoWidth: 1024, videoHeight: 576}, legacy.stream.getVideoTracks()[0]);
+  assert.equal(legacyMeta.width, 1024);
+  assert.equal(legacyMeta.height, 576);
+  assert.equal(legacyMeta.deviceClass, "legacy-webcam-utility");
+
+  const seen = [];
+  const card = await openCamera(async constraints => {
+    seen.push(constraints.video);
+    const video = constraints.video;
+    if (video && video !== true && (video.facingMode || video.width || video.height)) throw fail("OverconstrainedError");
+    return streamFrom([liveTrack({
+      label: "Elgato Cam Link 4K",
+      settings: {deviceId: "elgato", width: 3840, height: 2160, frameRate: 30},
+      capabilities: {width: {min: 640, max: 3840}, height: {min: 480, max: 2160}, frameRate: {max: 60}, facingMode: ["user"]},
+    })]);
+  }, {facingMode: "environment", ...DEFAULT_CAPTURE_IDEAL});
+  assert.deepEqual(seen, [
+    {facingMode: {ideal: "environment"}, width: {ideal: 1280}, height: {ideal: 720}, frameRate: {ideal: 30}},
+    {facingMode: "environment"},
+    {width: {ideal: 1280}, height: {ideal: 720}, frameRate: {ideal: 30}},
+    true,
+  ]);
+  const cardTrack = card.stream.getVideoTracks()[0];
+  const cardMeta = readLiveVideoMetadata({videoWidth: 0, videoHeight: 0}, cardTrack);
+  assert.equal(cardMeta.width, 3840);
+  assert.equal(cardMeta.height, 2160);
+  assert.equal(cardMeta.sizeSource, "settings");
+  assert.equal(cardMeta.deviceClass, "capture-card");
+  assert.deepEqual(cardMeta.capabilities.width, {min: 640, max: 3840});
+  assert.deepEqual(cardMeta.capabilities.facingMode, ["user"]);
+
+  const continuity = await openCamera(async constraints => {
+    const video = constraints.video;
+    if (video && video !== true && (video.width?.ideal >= 3840 || video.height?.ideal >= 2160)) throw fail("OverconstrainedError");
+    const portrait = video && video !== true && video.height?.ideal === 1440;
+    return streamFrom([liveTrack({
+      label: "Continuity Camera",
+      settings: {deviceId: "iphone", width: portrait ? 1920 : 1920, height: portrait ? 1440 : 1080, frameRate: 30},
+    })]);
+  }, {deviceId: "iphone", width: 3840, height: 2160, frameRate: 30});
+  assert.equal(continuity.constraints.video.width, undefined);
+  const phone = readLiveVideoMetadata({videoWidth: 1920, videoHeight: 1440}, continuity.stream.getVideoTracks()[0]);
+  assert.equal(phone.deviceClass, "continuity");
+  assert.equal(phone.width, 1920);
+  assert.equal(phone.height, 1440);
+  assert.equal(phone.sizeSource, "video");
+
+  const delivered = chooseLiveSize({videoWidth: 1920, videoHeight: 1440, settingsWidth: 1280, settingsHeight: 720});
+  assert.equal(delivered.source, "video");
+  assert.deepEqual([delivered.width, delivered.height], [1920, 1440]);
+  const switched = chooseLiveSize({
+    videoWidth: 1920, videoHeight: 1440, settingsWidth: 3840, settingsHeight: 2160, previous: delivered,
+  });
+  assert.equal(switched.source, "settings");
+  assert.deepEqual([switched.width, switched.height], [3840, 2160]);
+  const rotated = chooseLiveSize({
+    videoWidth: 1440, videoHeight: 1920, settingsWidth: 3840, settingsHeight: 2160, previous: switched,
+  });
+  assert.equal(rotated.source, "video");
+  assert.deepEqual([rotated.width, rotated.height], [1440, 1920]);
+
+  const video = new EventTarget();
+  video.videoWidth = 1920;
+  video.videoHeight = 1080;
+  let frame = null;
+  let cancelled = 0;
+  video.requestVideoFrameCallback = callback => { frame = callback; return 4; };
+  video.cancelVideoFrameCallback = () => { cancelled += 1; };
+  const orientation = new EventTarget();
+  const events = [];
+  const track = liveTrack({label: "Pixel 9", settings: {deviceId: "pixel", width: 1920, height: 1080, frameRate: 30}});
+  const stop = watchLiveVideo(video, () => track, (meta, info) => events.push({meta, info}), {orientation});
+  assert.equal(events.at(-1).meta.deviceClass, "device-as-webcam");
+  assert.equal(events.at(-1).info.reason, "attach");
+  frame();
+  assert.equal(events.at(-1).info.reason, "attach");
+  track.getSettings = () => ({deviceId: "pixel", width: 3840, height: 2160, frameRate: 30});
+  frame();
+  assert.equal(events.at(-1).info.reason, "frame");
+  assert.equal(events.at(-1).meta.width, 3840);
+  assert.equal(events.at(-1).meta.sizeSource, "settings");
+  video.videoWidth = 2160;
+  video.videoHeight = 3840;
+  orientation.dispatchEvent(new Event("change"));
+  assert.equal(events.at(-1).info.reason, "orientation");
+  assert.equal(events.at(-1).meta.width, 2160);
+  assert.equal(events.at(-1).meta.height, 3840);
+  assert.equal(events.at(-1).meta.sizeSource, "video");
+  stop();
+  assert.equal(cancelled, 1);
 });
 
 test("releaseStream stops every track even when one stop throws", () => {
